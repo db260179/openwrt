@@ -34,6 +34,7 @@ ramips_setup_interfaces()
 	11acnas|\
 	dir-615-h1|\
 	w2914nsv2|\
+	zbt-we826t2-16M|\
 	zbt-we2026)
 		ucidef_add_switch "switch0" \
 			"0:lan:4" "1:lan:3" "2:lan:2" "3:lan:1" "4:wan:5" "6@eth0"

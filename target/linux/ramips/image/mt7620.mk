@@ -639,6 +639,15 @@ define Device/zbt-we2026
 endef
 TARGET_DEVICES += zbt-we2026
 
+define Device/zbt-we826t2-16M
+  DTS := ZBT-WE826T2-16M
+  IMAGE_SIZE := $(ralink_default_fw_size_16M)
+  SUPPORTED_DEVICES += zbt-we826
+  DEVICE_TITLE := Zbtlink ZBT-WE826T2 (16M)
+  DEVICE_PACKAGES := kmod-usb2 kmod-usb-ohci kmod-mt76 kmod-sdhci-mt7620 
+endef
+TARGET_DEVICES += zbt-we826t2-16M
+
 define Device/zbt-we826-16M
   DTS := ZBT-WE826-16M
   IMAGE_SIZE := $(ralink_default_fw_size_16M)

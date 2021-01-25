@@ -28,6 +28,7 @@ miwifi-nano|\
 sk-wb8|\
 wsr-1166|\
 wsr-600|\
+zbt-we826t2-16m|\
 zbt-wg2626)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x1000" "0x10000"
 	;;
