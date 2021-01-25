@@ -173,6 +173,17 @@ define Device/mir3g
 endef
 TARGET_DEVICES += mir3g
 
+define Device/mir4ag
+  DTS := MIR4AG
+  MTK_SOC := mt7621
+  IMAGE_SIZE := 14848k
+  DEVICE_VENDOR := Xiaomi
+  DEVICE_TITLE := Xiaomi Mi Router 4A Gigabit Edition
+  DEVICE_MODEL := Mi Router 4A
+  DEVICE_PACKAGES := kmod-mt7603 kmod-mt76x2 wpad-mini uboot-envtools
+endef
+TARGET_DEVICES += mir4ag
+
 define Device/mt7621
   DTS := MT7621
   BLOCKSIZE := 64k

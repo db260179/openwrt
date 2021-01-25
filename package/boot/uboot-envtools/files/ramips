@@ -32,6 +32,7 @@ zbt-we826t2-16m|\
 zbt-wg2626)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x1000" "0x10000"
 	;;
+mir4ag|\
 mir3g)
 	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x1000" "0x20000"
 	;;
