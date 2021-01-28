@@ -93,6 +93,7 @@ platform_check_image() {
 	m4-8M|\
 	mac1200rv2|\
 	microwrt|\
+	mir4ag|\
 	miniembplug|\
 	miniembwifi|\
 	miwifi-mini|\
@@ -218,6 +219,7 @@ platform_check_image() {
 	zbt-we1326|\
 	zbt-we2026|\
 	zbtlink,zbt-we3526|\
+	zbt-we826t2-16M|\
 	zbt-we826-16M|\
 	zbt-we826-32M|\
 	zbt-wg2626|\

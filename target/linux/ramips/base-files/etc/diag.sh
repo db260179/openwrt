@@ -333,6 +333,7 @@ get_status_led() {
 		status_led="$boardname:green:4g-0"
 		;;
 	zbt-we826-16M|\
+	zbt-we826t2-16M|\
 	zbt-we826-32M)
 		status_led="zbt-we826:green:power"
 		;;

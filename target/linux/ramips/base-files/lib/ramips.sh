@@ -283,6 +283,9 @@ ramips_board_detect() {
 	*"Mi Router 3G")
 		name="mir3g"
 		;;
+	*"Mi Router 4A Gigabit Edition")
+		name="mir4ag"
+		;;
 	*"MicroWRT")
 		name="microwrt"
 		;;
@@ -687,6 +690,9 @@ ramips_board_detect() {
 		;;
 	*"ZBT-WE2026")
 		name="zbt-we2026"
+		;;
+	*"ZBT-WE826T2 (16M)")
+		name="zbt-we826t2-16M"
 		;;
 	*"ZBT-WE826 (16M)")
 		name="zbt-we826-16M"
