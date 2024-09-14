@@ -1,4 +1,13 @@
 #!/bin/bash
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+  echo "Error: Docker is not installed or not found in PATH."
+  echo "Please install Docker or ensure it is available in your PATH."
+  exit 1
+fi
+
+# Enable debugging if DEBUG is set to true
 if [ "${DEBUG}" == "true" ]; then
   set -x
 else
@@ -9,69 +18,78 @@ opt=$2
 export USERUID="$(id -u)"
 export USERGID="$(id -g)"
 GITBRANCH=$(git branch --show-current)
-DCKRIMAGE="openwrt-imagebuild-$GITBRANCH:latest"
-DCKRNAME="openwrt-imagebuild-$GITBRANCH"
-BARGS="--build-arg USERUID=$USERUID --build-arg USERGID=$USERGID"
-ARGS="--rm --name $DCKRNAME -d --cap-add NET_ADMIN -v $PWD/openwrt:/home/buser/openwrt -v $PWD/../../dl:/home/buser/openwrt/dl"
+DCKRIMAGE="openwrt-imagebuild-${GITBRANCH}:latest"
+DCKRNAME="openwrt-imagebuild-${GITBRANCH}"
+BARGS="--build-arg USERUID=${USERUID} --build-arg USERGID=${USERGID}"
+ARGS="--init --rm --name ${DCKRNAME} -d --cap-add NET_ADMIN -v ${PWD}/openwrt:/home/buser/openwrt -v ${PWD}/../../dl:/home/buser/openwrt/dl"
 
-# Check if docker image exist, if not build image
-if test ! -z "$(docker images -q $DCKRIMAGE)"; then
-   echo "Ready to Start!"
+# Check if Docker image exists, if not, build the image
+if [ -n "$(docker images -q ${DCKRIMAGE})" ]; then
+   echo "Docker image ${DCKRIMAGE} is ready!"
 else
-   echo "$DCKRIMAGE doesnt exist!, running './$0 build-image' first!"
-   docker build $BARGS -t $DCKRIMAGE -f Dockerfile.build .
+   echo "Docker image ${DCKRIMAGE} does not exist. Running './$0 build-image' to create it."
+   docker build ${BARGS} -t ${DCKRIMAGE} -f Dockerfile.build .
 fi
 
+# Function to handle building and logging
+build_and_watch() {
+  echo "Build started - now watching ${DCKRNAME}"
+  echo "Press CTRL+C to stop watching!"
+  echo "To stop the build completely - './$0 stop'"
+  docker logs -f ${DCKRNAME}
+}
+
+# Main command handler
 case "$1" in
   build-image)
-    docker build $BARGS -t $DCKRIMAGE -f Dockerfile.build .
+    echo "Building Docker image ${DCKRIMAGE}..."
+    docker build ${BARGS} -t ${DCKRIMAGE} -f Dockerfile.build .
     ;;
   build-official)
-    docker run $ARGS $DCKRIMAGE build-official $2 $3
-    echo "Build started - now watching $DCKRNAME"
-    echo "Press CTRL+C to stop watching!"
-    echo "To stop build completely - '$0 stop'"
-    docker logs -f $DCKRNAME
+    echo "Building official OpenWrt firmware using ${DCKRIMAGE}..."
+    docker run ${ARGS} ${DCKRIMAGE} build-official ${2} ${3}
+    build_and_watch
     ;;
   build-custom)
-    docker run $ARGS $DCKRIMAGE build-custom $opt
-    echo "Build started - now watching $DCKRNAME"
-    echo "Press CTRL+C to stop watching!"
-    echo "To stop build completely - '$0 stop'"
-    docker logs -f $DCKRNAME
+    echo "Building custom OpenWrt firmware using ${DCKRIMAGE}..."
+    docker run ${ARGS} ${DCKRIMAGE} build-custom ${opt}
+    build_and_watch
     ;;
   rebuild)
-    docker run $ARGS $DCKRIMAGE build-rebuild
+    echo "Rebuilding the OpenWrt firmware..."
+    docker run ${ARGS} ${DCKRIMAGE} build-rebuild
     ;;
   clean-min)
-    docker run $ARGS $DCKRIMAGE clean-min
+    echo "Performing a minimal cleanup..."
+    docker run ${ARGS} ${DCKRIMAGE} clean-min
     ;;
   clean-full)
-    docker run $ARGS $DCKRIMAGE clean-full
+    echo "Performing a full cleanup..."
+    docker run ${ARGS} ${DCKRIMAGE} clean-full
     ;;
   watch-build)
-    echo "Press CTRL+C to stop watching!"
-    echo "To stop build completely - '$0 stop'"
-    sleep 5
-    docker logs -f $DCKRNAME
+    echo "Watching the OpenWrt build logs..."
+    docker logs -f ${DCKRNAME}
     ;;
   stop)
-    docker stop -t 60 $DCKRNAME
+    echo "Stopping the Docker container ${DCKRNAME}..."
+    docker stop -t 60 ${DCKRNAME}
     ;;
   shell)
-    docker run --rm --name $DCKRNAME -it --entrypoint /bin/bash \
-    --cap-add NET_ADMIN -v $PWD/openwrt:/home/buser/openwrt -v $PWD/../../dl:/home/buser/openwrt/dl $DCKRIMAGE
+    echo "Entering the Docker container shell..."
+    docker run --init --rm --name ${DCKRNAME} -it --entrypoint /bin/bash \
+      --privileged -v ${PWD}/openwrt:/home/buser/openwrt -v ${PWD}/../../dl:/home/buser/openwrt/dl ${DCKRIMAGE}
     ;;
   *)
-    echo "Usage: $0 {build-image|build-official|build-custom|rebuild|clean-min|clean-full|stop}" >&2
-    echo "build-image: Build $DCKRIMAGE to build openwrt firmware images" >&2
-    echo "build-official: Build Openwrt with official config using $DCKRIMAGE [specify target name .i.e. ramips/mt7621]" >&2
-    echo "build-custom: Build Openwrt with custom config (Custom.config) using $DCKRIMAGE" >&2
-    echo "rebuild: Restart build process" >&2
-    echo "clean-min: Cleanup minimum build - keep config" >&2
-    echo "clean-full: Cleanup full build - clean slate" >&2
-    echo "watch-build: Watch the Openwrt build on container" >&2
-    echo "shell: Enter bash shell in docker container" >&2
+    echo "Usage: $0 {build-image|build-official|build-custom|rebuild|clean-min|clean-full|stop|shell|watch-build}" >&2
+    echo "build-image: Build the Docker image ${DCKRIMAGE} for OpenWrt firmware builds." >&2
+    echo "build-official: Build OpenWrt with official config. Specify the target (e.g., ramips/mt7621)." >&2
+    echo "build-custom: Build OpenWrt with custom config (Custom.config)." >&2
+    echo "rebuild: Restart the build process." >&2
+    echo "clean-min: Perform a minimal cleanup (keep config)." >&2
+    echo "clean-full: Perform a full cleanup (clean slate)." >&2
+    echo "watch-build: Watch the OpenWrt build in the container." >&2
+    echo "shell: Enter a bash shell in the Docker container." >&2
     exit 1
     ;;
 esac
