@@ -964,14 +964,12 @@ dnsmasq_start()
 	append_bool "$cfg" noping "--no-ping"
 	append_bool "$cfg" rapidcommit "--dhcp-rapid-commit"
 	append_bool "$cfg" scriptarp "--script-arp"
-	append_bool "$cfg" add_mac "--add-mac"
 
 	append_bool "$cfg" filter_aaaa "--filter-AAAA"
 	append_bool "$cfg" filter_a "--filter-A"
 
 	append_parm "$cfg" logfacility "--log-facility"
 	config_get logfacility "$cfg" "logfacility"
-	append_parm "$cfg" add_subnet "--add-subnet"
 	append_parm "$cfg" cachesize "--cache-size"
 	append_parm "$cfg" dnsforwardmax "--dns-forward-max"
 	append_parm "$cfg" port "--port"
@@ -1102,6 +1100,11 @@ dnsmasq_start()
 		[ "$addmac" = "1" ] && addmac=
 		xappend "--add-mac${addmac:+="$addmac"}"
 	}
+
+	append_bool "$cfg" addmac "--add-mac"
+	append_bool "$cfg" stripmac "--strip-mac"
+	append_parm "$cfg" addsubnet "--add-subnet"
+	append_bool "$cfg" stripsubnet "--strip-subnet"
 
 	dhcp_option_add "$cfg" "" 0
 	dhcp_option_add "$cfg" "" 2
