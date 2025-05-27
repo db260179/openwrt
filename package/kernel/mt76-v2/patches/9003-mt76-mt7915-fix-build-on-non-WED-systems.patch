@@ -1,0 +1,13 @@
+--- a/tx.c
++++ b/tx.c
+@@ -849,8 +849,10 @@ int mt76_token_consume(struct mt76_dev *
+ 		return -EINVAL;
+ 	}
+ 
++#ifdef CONFIG_NET_MEDIATEK_SOC_WED
+ 	if (mtk_wed_device_active(&dev->mmio.wed))
+ 		start = dev->mmio.wed.wlan.nbuf;
++#endif
+ 
+ 	token = idr_alloc(&dev->token, *ptxwi, start, start + dev->token_size,
+ 			  GFP_ATOMIC);
