@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Enable debugging if DEBUG is set to true
+if [ "${DEBUG}" == "true" ]; then
+  set -x
+else
+  set -e
+fi
+
 opt="$@"
 arguments=("$@")
 
@@ -87,7 +94,7 @@ build-custom () {
 }
 
 build-rebuild () {
-    make clean
+    make dirclean
     make defconfig
     echo "Start build and log to build.log"
     make -j$(($(nproc)+1)) V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
@@ -99,7 +106,7 @@ build-rebuild-ignore () {
 }
 
 clean-min () {
-    make clean
+    make dirclean
 }
 
 clean-full () {
