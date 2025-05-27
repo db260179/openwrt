@@ -1,0 +1,85 @@
+--- a/drivers/net/dsa/mt7530.c
++++ b/drivers/net/dsa/mt7530.c
+@@ -2266,6 +2266,17 @@ mt7530_setup(struct dsa_switch *ds)
+ 	val |= MHWTRAP_MANUAL;
+ 	mt7530_write(priv, MT7530_MHWTRAP, val);
+ 
++	/* Disable flow control for P5 and P6 ports - mt7621 cpu bug */
++	usleep_range(10, 20);
++
++	val = mt7530_read(priv, 0x1FE0);
++	val &= ~BIT(31);
++	mt7530_write(priv, 0x1FE0, val);
++
++	mt7530_write(priv, MT7530_PMCR_P(5), 0x5e30b);
++	mt7530_write(priv, MT7530_PMCR_P(6), 0x5e30b);
++	usleep_range(10, 20);
++
+ 	priv->p6_interface = PHY_INTERFACE_MODE_NA;
+ 
+ 	mt753x_trap_frames(priv);
+@@ -2849,10 +2860,6 @@ static void mt753x_phylink_mac_link_up(s
+ 	}
+ 	if (duplex == DUPLEX_FULL) {
+ 		mcr |= PMCR_FORCE_FDX;
+-		if (tx_pause)
+-			mcr |= PMCR_TX_FC_EN;
+-		if (rx_pause)
+-			mcr |= PMCR_RX_FC_EN;
+ 	}
+ 
+ 	if (mode == MLO_AN_PHY && phydev && phy_init_eee(phydev, 0) >= 0) {
+@@ -2989,11 +2996,6 @@ static void mt7530_pcs_get_state(struct
+ 		break;
+ 	}
+ 
+-	state->pause &= ~(MLO_PAUSE_RX | MLO_PAUSE_TX);
+-	if (pmsr & PMSR_RX_FC)
+-		state->pause |= MLO_PAUSE_RX;
+-	if (pmsr & PMSR_TX_FC)
+-		state->pause |= MLO_PAUSE_TX;
+ }
+ 
+ static int mt753x_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -783,9 +783,7 @@ static void mtk_gdm_mac_link_up(struct m
+ 	u32 mcr;
+ 
+ 	mcr = mtk_r32(mac->hw, MTK_MAC_MCR(mac->id));
+-	mcr &= ~(MAC_MCR_SPEED_100 | MAC_MCR_SPEED_1000 |
+-		 MAC_MCR_FORCE_DPX | MAC_MCR_FORCE_TX_FC |
+-		 MAC_MCR_FORCE_RX_FC);
++	mcr &= ~(MAC_MCR_SPEED_100 | MAC_MCR_SPEED_1000 | MAC_MCR_FORCE_DPX);
+ 
+ 	/* Configure speed */
+ 	mac->speed = speed;
+@@ -803,12 +801,6 @@ static void mtk_gdm_mac_link_up(struct m
+ 	if (duplex == DUPLEX_FULL)
+ 		mcr |= MAC_MCR_FORCE_DPX;
+ 
+-	/* Configure pause modes - phylink will avoid these for half duplex */
+-	if (tx_pause)
+-		mcr |= MAC_MCR_FORCE_TX_FC;
+-	if (rx_pause)
+-		mcr |= MAC_MCR_FORCE_RX_FC;
+-
+ 	mcr |= MAC_MCR_TX_EN | MAC_MCR_RX_EN;
+ 	mtk_w32(mac->hw, mcr, MTK_MAC_MCR(mac->id));
+ }
+@@ -834,14 +826,7 @@ static void mtk_xgdm_mac_link_up(struct
+ 	mtk_m32(mac->hw, MTK_XGMAC_FORCE_LINK(mac->id), force_link, MTK_XGMAC_STS(mac->id));
+ 
+ 	mcr = mtk_r32(mac->hw, MTK_XMAC_MCR(mac->id));
+-	mcr &= ~(XMAC_MCR_FORCE_TX_FC | XMAC_MCR_FORCE_RX_FC | XMAC_MCR_TRX_DISABLE);
+-	/* Configure pause modes -
+-	 * phylink will avoid these for half duplex
+-	 */
+-	if (tx_pause)
+-		mcr |= XMAC_MCR_FORCE_TX_FC;
+-	if (rx_pause)
+-		mcr |= XMAC_MCR_FORCE_RX_FC;
++	mcr &= ~(XMAC_MCR_TRX_DISABLE);
+ 
+ 	mtk_w32(mac->hw, mcr, MTK_XMAC_MCR(mac->id));
+ }
