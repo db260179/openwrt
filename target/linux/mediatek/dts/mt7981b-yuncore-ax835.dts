@@ -100,6 +100,10 @@
 		compatible = "mediatek,mt7531";
 		reg = <31>;
 		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupt-parent = <&pio>;
+		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
 	};
 };
 
@@ -180,7 +184,7 @@
 					#address-cells = <1>;
 					#size-cells = <1>;
 
-					eeprom_factory: eeprom@0 {
+					eeprom_factory_0: eeprom@0 {
 						reg = <0x0 0x1000>;
 					};
 
@@ -253,6 +257,6 @@
 
 &wifi {
 	status = "okay";
-	nvmem-cells = <&eeprom_factory 0>;
+	nvmem-cells = <&eeprom_factory_0>;
 	nvmem-cell-names = "eeprom";
 };
