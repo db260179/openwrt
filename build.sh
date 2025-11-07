@@ -46,7 +46,7 @@ build-official () {
     echo "Copy Openwrt official config..."
     release=$(grep -m1 '$(VERSION_REPO),' include/version.mk |  -F, '{ print $3 }' | sed 's/[)]//g')
 
-    wget $release/targets/$target/config.buildinfo -O .config
+    wget "$release/targets/$target/config.buildinfo" -O .config
 
     echo "Set to use default config"
     make defconfig
@@ -58,8 +58,18 @@ build-official () {
         make download
     fi
 
+    echo "Starting official build..."
+    # Record start time
+    start_time=$(date +%s)
+
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+
+    # Record end time
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+
+    echo "Official build finished in $(date -u -d "@$duration" +"%H hours %M minutes %S seconds")."
 }
 
 build-custom () {
@@ -106,20 +116,50 @@ build-custom () {
         make download
     fi
 
+    echo "Starting custom build..."
+    # Record start time
+    start_time=$(date +%s)
+
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+
+    # Record end time
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+
+    echo "Custom build finished in $(date -u -d "@$duration" +"%H hours %M minutes %S seconds")."
 }
 
 build-rebuild () {
+    echo "Starting rebuild..."
+    # Record start time
+    start_time=$(date +%s)
+
     make dirclean
     make defconfig
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+
+    # Record end time
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+
+    echo "Rebuild finished in $(date -u -d "@$duration" +"%H hours %M minutes %S seconds")."
 }
 
 build-rebuild-ignore () {
+    echo "Starting rebuild (ignoring errors)..."
+    # Record start time
+    start_time=$(date +%s)
+
     echo "Start build and log to build.log - Ignoring build errors..."
-    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -i -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+
+    # Record end time
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+
+    echo "Rebuild (ignoring errors) finished in $(date -u -d "@$duration" +"%H hours %M minutes %S seconds")."
 }
 
 clean-min () {
