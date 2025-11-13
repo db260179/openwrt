@@ -1,15 +1,15 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=mt76-v2
-PKG_RELEASE=3
+PKG_RELEASE=4
 
 PKG_LICENSE:=GPLv2
 PKG_LICENSE_FILES:=
 
 PKG_SOURCE_URL:=https://github.com/db260179/mt76
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2024-08-01
-PKG_SOURCE_VERSION:=bc000689bc4100c3016deefe5086b2a7d8b6fd57
+PKG_SOURCE_DATE:=2024-08-27
+PKG_SOURCE_VERSION:=b64a0df3585512338c5b28f56212a6ed58d0faa7
 PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=David Bentham <db260179@gmail.com>
@@ -233,7 +233,7 @@ endef
 
 define KernelPackage/mt7915e-v2
   $(KernelPackage/mt76-default-v2)
-  TITLE:=MediaTek MT7915e wireless driver
+  TITLE:=MediaTek MT7915e/MT7981/MT7986/MT7916 wireless driver
   DEPENDS+=@PCI_SUPPORT +kmod-mt76-connac-v2 +kmod-hwmon-core +kmod-thermal +@DRIVER_11AX_SUPPORT +@KERNEL_RELAY
   FILES:= $(PKG_BUILD_DIR)/mt7915/mt7915e.ko
   AUTOLOAD:=$(call AutoProbe,mt7915e)
@@ -518,6 +518,8 @@ define KernelPackage/mt7915-firmware-v2/install
 		$(PKG_BUILD_DIR)/firmware/mt7915_wa.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7915_wm.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7915_rom_patch.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7915_eeprom.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7915_eeprom_dbdc.bin \
 		$(1)/lib/firmware/mediatek
 endef
 
@@ -536,7 +538,13 @@ define KernelPackage/mt7981-firmware-v2/install
 		$(PKG_BUILD_DIR)/firmware/mt7981_wa.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7981_wm.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7981_rom_patch.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7981_eeprom_mt7976_dbdc.bin \
 		$(1)/lib/firmware/mediatek
+ifdef CONFIG_NET_MEDIATEK_SOC_WED
+	cp \
+		$(PKG_BUILD_DIR)/firmware/mt7981_wo.bin \
+		$(1)/lib/firmware/mediatek
+endif
 endef
 
 define KernelPackage/mt7986-firmware-v2/install
@@ -547,7 +555,18 @@ define KernelPackage/mt7986-firmware-v2/install
 		$(PKG_BUILD_DIR)/firmware/mt7986_wm.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7986_rom_patch_mt7975.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7986_rom_patch.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_eeprom_mt7975_dual.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_eeprom_mt7976_dual.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_eeprom_mt7975.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_eeprom_mt7976.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_eeprom_mt7976_dbdc.bin \
 		$(1)/lib/firmware/mediatek
+ifdef CONFIG_NET_MEDIATEK_SOC_WED
+	cp \
+		$(PKG_BUILD_DIR)/firmware/mt7986_wo_0.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_wo_1.bin \
+		$(1)/lib/firmware/mediatek
+endif
 endef
 
 define KernelPackage/mt7921-firmware-v2/install
@@ -569,6 +588,11 @@ endef
 define Package/mt76-test-v2/install
 	mkdir -p $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tools/mt76-test $(1)/usr/sbin
+endef
+
+define Build/InstallDev
+	mkdir -p $(STAGING_DIR_IMAGE)
+	$(CP) $(PKG_BUILD_DIR)/firmware/mt7981_eeprom_mt7976_dbdc.bin $(STAGING_DIR_IMAGE)/
 endef
 
 $(eval $(call KernelPackage,mt76-core-v2))
