@@ -1,0 +1,28 @@
+FROM debian:bullseye
+
+ARG USERUID
+ARG USERGID
+
+ENV USERID=$USERUID \
+    GROUPID=$USERGID
+
+RUN apt-get update && \
+    apt-get install -y time git-core subversion build-essential ccache ecj fastjar file screen quilt \
+    g++ java-propose-classpath libelf-dev bash make patch libncurses5 libncurses5-dev zlib1g-dev gawk \
+    flex gettext wget unzip xz-utils python3-distutils rsync libncursesw5-dev libssl-dev \
+    python3-setuptools python3-dev swig xsltproc zlib1g-dev nano curl gcc-multilib && \
+    apt-get clean && \
+    groupadd --gid $GROUPID buser && \
+    useradd --uid $USERID --gid $GROUPID -m -s /bin/bash buser
+
+USER buser
+WORKDIR /home/buser
+
+# set dummy git config and quilt settings
+RUN git config --global user.name "buser" && git config --global user.email "buser@build-openwrt.com"
+COPY quiltrc /home/buser/.quiltrc
+
+# Switch to openwrt folder
+WORKDIR /home/buser/openwrt
+
+ENTRYPOINT [ "./build.sh" ]
