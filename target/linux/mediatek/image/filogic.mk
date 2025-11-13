@@ -335,6 +335,7 @@ define Device/comfast_cf-e393ax
   PAGESIZE := 2048
   IMAGE_SIZE := 65536k
   KERNEL_IN_UBI := 1
+  UBOOTENV_IN_UBI := 1
   IMAGES := sysupgrade.bin factory.bin
   IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
@@ -343,6 +344,31 @@ define Device/comfast_cf-e393ax
   ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot comfast_cf-e393ax
 endef
 TARGET_DEVICES += comfast_cf-e393ax
+
+define Device/comfast_cf-e395ax
+  DEVICE_VENDOR := Comfast
+  DEVICE_MODEL := CF-E395AX
+  DEVICE_DTS := mt7981a-comfast-cf-e395ax
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7981-firmware mt7981-wo-firmware
+  KERNEL = kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS = kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 65536k
+  KERNEL_IN_UBI := 1
+  UBOOTENV_IN_UBI := 1
+  IMAGES := sysupgrade.bin factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  ARTIFACTS := preloader.bin bl31-uboot.fip
+  ARTIFACT/preloader.bin := mt7981-bl2 spim-nand-ddr3
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot comfast_cf-e395ax
+endef
+TARGET_DEVICES += comfast_cf-e395ax
 
 define Device/confiabits_mt7981
   DEVICE_VENDOR := Confiabits
