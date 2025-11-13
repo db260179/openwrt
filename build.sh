@@ -7,6 +7,23 @@ else
   set -e
 fi
 
+# Default to automatic core calculation if not specified by the user
+num_cores=$(($(nproc) + 1))
+
+# Parse the -j option if specified by the user
+while getopts ":j:" opt; do
+  case $opt in
+    j)
+      num_cores="$OPTARG"
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
 opt="$@"
 arguments=("$@")
 
@@ -15,8 +32,8 @@ build-official () {
 
     if [ -z "$target" ]; then
     echo "Please specify the build target when using 'build-official'."
-    echo "Usage: $0 build-official <target>"
-    echo "Example: $0 build-official ramips/mt7621"
+    echo "Usage: $0 build-official <target> [-j <cores>]"
+    echo "Example: $0 build-official ramips/mt7621 -j 4"
     exit 1
     fi
 
@@ -27,7 +44,7 @@ build-official () {
     ./scripts/feeds install -a && ./scripts/feeds install -a
 
     echo "Copy Openwrt official config..."
-    release=$(grep -m1 '$(VERSION_REPO),' include/version.mk | awk -F, '{ print $3 }' | sed 's/[)]//g')
+    release=$(grep -m1 '$(VERSION_REPO),' include/version.mk |  -F, '{ print $3 }' | sed 's/[)]//g')
 
     wget $release/targets/$target/config.buildinfo -O .config
 
@@ -42,7 +59,7 @@ build-official () {
     fi
 
     echo "Start build and log to build.log"
-    make -j$(($(nproc)+1)) V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
 }
 
 build-custom () {
@@ -90,19 +107,19 @@ build-custom () {
     fi
 
     echo "Start build and log to build.log"
-    make -j$(($(nproc)+1)) V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
 }
 
 build-rebuild () {
     make dirclean
     make defconfig
     echo "Start build and log to build.log"
-    make -j$(($(nproc)+1)) V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
 }
 
 build-rebuild-ignore () {
     echo "Start build and log to build.log - Ignoring build errors..."
-    make -i -j$(($(nproc)+1)) V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
 }
 
 clean-min () {
@@ -133,9 +150,10 @@ case "$1" in
         clean-full
         ;;
     *)
-        echo "Usage: $0 {build-official|build-custom|build-rebuild|build-rebuild-ignore|clean-min|clean-full} [nodownload] [routerconf]" >&2
+        echo "Usage: $0 {build-official|build-custom|build-rebuild|build-rebuild-ignore|clean-min|clean-full} [-j <cores>] [nodownload] [routerconf]" >&2
         echo "build-official: specify target name .i.e. ramips/mt7621 {Openwrt standard config}" >&2
         echo "build-custom: {Custom config}" >&2
+        echo "-j <cores>: Optional. Specify the number of cores for building." >&2
         echo "Optional: nodownload - No downloads of packages" >&2
         echo "Optional: routerconf - Get /etc/build.config from router" >&2
         exit 1
