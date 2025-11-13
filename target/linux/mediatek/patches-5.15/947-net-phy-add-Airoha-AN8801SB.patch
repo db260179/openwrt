@@ -1,0 +1,24 @@
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -160,6 +160,11 @@ config ADIN_PHY
+ 
+ source "drivers/net/phy/aquantia/Kconfig"
+ 
++config AIROHA_AN8801SB_PHY
++        tristate "Airoha AN8801SB Gigabit PHY"
++        help
++          Currently supports the Airoha AN8801SB PHY.
++
+ config AX88796B_PHY
+ 	tristate "Asix PHYs"
+ 	help
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -46,6 +46,7 @@ sfp-obj-$(CONFIG_SFP)		+= sfp-bus.o
+ obj-y				+= $(sfp-obj-y) $(sfp-obj-m)
+ 
+ obj-$(CONFIG_ADIN_PHY)		+= adin.o
++obj-$(CONFIG_AIROHA_AN8801SB_PHY) += an8801.o
+ obj-$(CONFIG_AMD_PHY)		+= amd.o
+ obj-$(CONFIG_AQUANTIA_PHY)	+= aquantia/
+ obj-$(CONFIG_AT803X_PHY)	+= at803x.o
