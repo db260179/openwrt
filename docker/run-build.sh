@@ -1,10 +1,16 @@
 #!/bin/bash
-#set -x
+if [ "${DEBUG}" == "true" ]; then
+  set -x
+else
+  set -e
+fi
+
 opt=$2
 export USERUID="$(id -u)"
 export USERGID="$(id -g)"
-DCKRIMAGE="openwrt-imagebuild:latest"
-DCKRNAME="openwrt-imagebuild"
+GITBRANCH=$(git branch --show-current)
+DCKRIMAGE="openwrt-imagebuild-$GITBRANCH:latest"
+DCKRNAME="openwrt-imagebuild-$GITBRANCH"
 BARGS="--build-arg USERUID=$USERUID --build-arg USERGID=$USERGID"
 ARGS="--rm --name $DCKRNAME -d --cap-add NET_ADMIN -v $PWD/openwrt:/home/buser/openwrt -v $PWD/../../dl:/home/buser/openwrt/dl"
 
