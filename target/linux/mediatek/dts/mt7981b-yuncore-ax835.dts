@@ -97,6 +97,10 @@
 	switch: switch@1f {
 		compatible = "mediatek,mt7531";
 		reg = <31>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupt-parent = <&pio>;
+		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
 		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
 	};
 };
@@ -227,7 +231,7 @@
 			label = "wan";
 
 			nvmem-cell-names = "mac-address";
-			nvmem-cells = <&macaddr_factory_2a 0>;
+			nvmem-cells = <&macaddr_factory_2a 1>;
 		};
 
 		port@6 {
