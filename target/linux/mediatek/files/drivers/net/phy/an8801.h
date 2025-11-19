@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* FILE NAME:  an8801.h
+/*
+ * FILE NAME:  an8801.h
  * PURPOSE:
- * Define AN8801SB driver function
+ *     Define AN8801SB driver function
  *
  * NOTES:
  *
@@ -11,7 +12,7 @@
 #define __AN8801_H
 
 /* NAMING DECLARATIONS */
-#define AN8801_DRIVER_VERSION  "1.0_Generic"
+#define AN8801_DRIVER_VERSION  "1.0.1_Generic"
 
 #define DEBUGFS_COUNTER         "counter"
 #define DEBUGFS_INFO            "driver_info"
@@ -22,83 +23,68 @@
 #define AN8801_MDIO_PHY_ID      0x1
 #define AN8801_PHY_ID1          0xc0ff
 #define AN8801_PHY_ID2          0x0421
-#define AN8801_PHY_ID      ((u32)((AN8801_PHY_ID1 << 16) | AN8801_PHY_ID2))
+#define AN8801_PHY_ID           ((u32)((AN8801_PHY_ID1 << 16) | AN8801_PHY_ID2))
 
-#define TRUE                    1
-#define FALSE                   0
 #define LINK_UP                 1
 #define LINK_DOWN               0
 
 #define MAX_LED_SIZE            3
-
 #define MAX_RETRY               5
 
-#define AN8801_EPHY_ADDR            0x11000000
-#define AN8801_CL22                 0x00800000
+#define AN8801_EPHY_ADDR        0x11000000
+#define AN8801_CL22             0x00800000
 
-#define LED_ENABLE                  1
-#define LED_DISABLE                 0
+#define LED_ENABLE              1
+#define LED_DISABLE             0
 
 #define AN8801SB_DEBUGFS
 
-#define GET_BIT(val, bit) (((val) & BIT(bit)) >> (bit))
+#ifndef GET_BIT
+#define GET_BIT(val, bit)       (((val) & BIT(bit)) >> (bit))
+#endif
 
-/* Register definitions */
-#define AN8801_IRQ_CTRL_REG1        0x10285404
-#define AN8801_IRQ_CTRL_REG2        0x10285400
-#define AN8801_IRQ_STATUS_REG       0x10285704
-#define AN8801_IRQ_ENABLE_REG       0x10285700
-#define AN8801_GPIO_IRQ_REG         0x1000007c
+#define LED_BCR                 (0x021)
+#define LED_BCR_EXT_CTRL        BIT(15)
+#define LED_BCR_EVT_ALL         BIT(4)
+#define LED_BCR_CLK_EN          BIT(3)
+#define LED_BCR_TIME_TEST       BIT(2)
+#define LED_BCR_MODE_MASK       (3)
+#define LED_BCR_MODE_DISABLE    (0)
+#define LED_BCR_MODE_2LED       (1)
+#define LED_BCR_MODE_3LED_1     (2)
+#define LED_BCR_MODE_3LED_2     (3)
 
-#define AN8801_IRQ_CTRL_VAL1        0x102
-#define AN8801_IRQ_CTRL_VAL2        0x12
-#define AN8801_IRQ_STATUS_MASK      0x11
-#define AN8801_IRQ_CLEAR_VAL        0x1f
-#define AN8801_IRQ_TRIGGER_BIT      0x10
+#define LED_ON_DUR              (0x022)
+#define LED_ON_DUR_MASK         (0xffff)
 
-/* LED Control Registers */
-#define LED_BCR                     (0x021)
-#define LED_BCR_EXT_CTRL            BIT(15)
-#define LED_BCR_EVT_ALL             BIT(4)
-#define LED_BCR_CLK_EN              BIT(3)
-#define LED_BCR_TIME_TEST           BIT(2)
-#define LED_BCR_MODE_MASK           (3)
-#define LED_BCR_MODE_DISABLE        (0)
-#define LED_BCR_MODE_2LED           (1)
-#define LED_BCR_MODE_3LED_1         (2)
-#define LED_BCR_MODE_3LED_2         (3)
+#define LED_BLK_DUR             (0x023)
+#define LED_BLK_DUR_MASK        (0xffff)
 
-#define LED_ON_DUR                  (0x022)
-#define LED_ON_DUR_MASK             (0xffff)
+#define LED_ON_CTRL(i)          (0x024 + ((i) * 2))
+#define LED_ON_EN               BIT(15)
+#define LED_ON_POL              BIT(14)
+#define LED_ON_EVT_MASK         (0x7f)
+#define LED_ON_EVT_FORCE        BIT(6)
+#define LED_ON_EVT_HDX          BIT(5)
+#define LED_ON_EVT_FDX          BIT(4)
+#define LED_ON_EVT_LINK_DN      BIT(3)
+#define LED_ON_EVT_LINK_10M     BIT(2)
+#define LED_ON_EVT_LINK_100M    BIT(1)
+#define LED_ON_EVT_LINK_1000M   BIT(0)
 
-#define LED_BLK_DUR                 (0x023)
-#define LED_BLK_DUR_MASK            (0xffff)
+#define LED_BLK_CTRL(i)         (0x025 + ((i) * 2))
+#define LED_BLK_EVT_MASK        (0x3ff)
+#define LED_BLK_EVT_FORCE       BIT(9)
+#define LED_BLK_EVT_10M_RX      BIT(5)
+#define LED_BLK_EVT_10M_TX      BIT(4)
+#define LED_BLK_EVT_100M_RX     BIT(3)
+#define LED_BLK_EVT_100M_TX     BIT(2)
+#define LED_BLK_EVT_1000M_RX    BIT(1)
+#define LED_BLK_EVT_1000M_TX    BIT(0)
 
-#define LED_ON_CTRL(i)              (0x024 + ((i) * 2))
-#define LED_ON_EN                   BIT(15)
-#define LED_ON_POL                  BIT(14)
-#define LED_ON_EVT_MASK             (0x7f)
-#define LED_ON_EVT_FORCE            BIT(6)
-#define LED_ON_EVT_HDX              BIT(5)
-#define LED_ON_EVT_FDX              BIT(4)
-#define LED_ON_EVT_LINK_DN          BIT(3)
-#define LED_ON_EVT_LINK_10M         BIT(2)
-#define LED_ON_EVT_LINK_100M        BIT(1)
-#define LED_ON_EVT_LINK_1000M       BIT(0)
+#define UNIT_LED_BLINK_DURATION 780
 
-#define LED_BLK_CTRL(i)             (0x025 + ((i) * 2))
-#define LED_BLK_EVT_MASK            (0x3ff)
-#define LED_BLK_EVT_FORCE           BIT(9)
-#define LED_BLK_EVT_10M_RX          BIT(5)
-#define LED_BLK_EVT_10M_TX          BIT(4)
-#define LED_BLK_EVT_100M_RX         BIT(3)
-#define LED_BLK_EVT_100M_TX         BIT(2)
-#define LED_BLK_EVT_1000M_RX        BIT(1)
-#define LED_BLK_EVT_1000M_TX        BIT(0)
-
-#define UNIT_LED_BLINK_DURATION     780
-
-/* Serdes auto negotiation */
+/* Serdes auto negotation restart */
 #define AN8801SB_SGMII_AN0_ANRESTART    (0x0200)
 #define AN8801SB_SGMII_AN0_AN_DONE      (0x0001)
 #define AN8801SB_SGMII_AN0_RESET        (0x8000)
@@ -115,20 +101,10 @@
 #define AN8801_RG_PKG_SEL_LSB       BIT(4)
 #define AN8801_RG_PKG_SEL_MSB       BIT(5)
 
-/* PBUS Register Addresses */
-#define AN8801_PBUS_HW_STRAP        0x10000094
-#define AN8801_PBUS_GPIO_CTRL1      0x10000054
-#define AN8801_PBUS_GPIO_CTRL2      0x10000058
-#define AN8801_PBUS_GPIO_CTRL3      0x10000070
-#define AN8801_PBUS_SERDES_CTRL1    0x10220010
-#define AN8801_PBUS_SERDES_CTRL2    0x10220000
-#define AN8801_PBUS_SERDES_STATUS   0x10220b04
-#define AN8801_PBUS_POLARITY        0x1022a0f8
-#define AN8801_PBUS_EFIFO_CTRL      0x10270100
-#define AN8801_PBUS_EFIFO_PARAM     0x10270108
-#define AN8801_PBUS_RGMII_CTRL      0x10005054
-
-/* User-defined LED configurations */
+/*
+ * For reference only
+ */
+/* User-defined.B */
 /* Link on(1G/100M/10M), no activity */
 #define AIR_LED0_ON \
 	(LED_ON_EVT_LINK_1000M | LED_ON_EVT_LINK_100M | LED_ON_EVT_LINK_10M)
@@ -138,14 +114,15 @@
 #define AIR_LED1_ON      (0x0)
 #define AIR_LED1_BLK \
 	(LED_BLK_EVT_1000M_TX | LED_BLK_EVT_1000M_RX | \
-	LED_BLK_EVT_100M_TX | LED_BLK_EVT_100M_RX | \
-	LED_BLK_EVT_10M_TX | LED_BLK_EVT_10M_RX)
+	 LED_BLK_EVT_100M_TX | LED_BLK_EVT_100M_RX | \
+	 LED_BLK_EVT_10M_TX | LED_BLK_EVT_10M_RX)
 
 /* Link on(100M/10M), activity(100M/10M TX/RX) */
 #define AIR_LED2_ON      (LED_ON_EVT_LINK_100M | LED_ON_EVT_LINK_10M)
 #define AIR_LED2_BLK \
 	(LED_BLK_EVT_100M_TX | LED_BLK_EVT_100M_RX | \
-	LED_BLK_EVT_10M_TX | LED_BLK_EVT_10M_RX)
+	 LED_BLK_EVT_10M_TX | LED_BLK_EVT_10M_RX)
+/* User-defined.E */
 
 /* Invalid data */
 #define INVALID_DATA            0xffffffff
@@ -216,10 +193,10 @@ struct AIR_LED_CFG_T {
 struct an8801_priv {
 	struct AIR_LED_CFG_T  led_cfg[MAX_LED_SIZE];
 	u32                   led_blink_cfg;
-	u8                    rxdelay_force;
-	u8                    txdelay_force;
+	bool                  rxdelay_force;
+	bool                  txdelay_force;
 	u16                   rxdelay_step;
-	u8                    rxdelay_align;
+	bool                  rxdelay_align;
 	u16                   txdelay_step;
 #ifdef AN8801SB_DEBUGFS
 	struct dentry        *debugfs_root;
