@@ -327,11 +327,16 @@ TARGET_DEVICES += bolt_arion
 
 define Device/comfast_cf-ac101
   $(Device/dsa-migration)
-  IMAGE_SIZE := 15360k
+  $(Device/uimage-lzma-loader)
+  IMAGE_SIZE := 15744k
   DEVICE_VENDOR := COMFAST
   DEVICE_MODEL := CF-AC101
   DEVICE_PACKAGES := -uboot-envtools
-  KERNEL := kernel-bin | append-dtb | lzma | uImage lzma
+  KERNEL_SIZE := 4096k
+  KERNEL := kernel-bin | append-dtb | lzma | loader-kernel | \
+	uImage none
+  KERNEL_INITRAMFS := kernel-bin | append-dtb | lzma | loader-kernel | \
+	uImage none
   IMAGES += factory.bin
   IMAGE/sysupgrade.bin := append-kernel | append-rootfs | pad-rootfs | \
 	check-size | append-metadata

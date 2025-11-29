@@ -79,6 +79,18 @@
 				label = "firmware";
 				reg = <0x50000 0xf70000>;
 			};
+
+			partition@fc0000 {
+				label = "configs";
+				reg = <0xfc0000 0x40000>;
+				read-only;
+			};
+
+			partition@1000000 {
+				label = "reserve";
+				reg = <0x1000000 0x1000000>;  // 16MB chip total
+				read-only;
+			};
 		};
 	};
 };
