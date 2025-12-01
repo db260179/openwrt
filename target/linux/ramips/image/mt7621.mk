@@ -661,6 +661,23 @@ define Device/bolt_arion
 endef
 TARGET_DEVICES += bolt_arion
 
+define Device/comfast_cf-ac101
+  $(Device/dsa-migration)
+  $(Device/uimage-lzma-loader)
+  IMAGE_SIZE := 15744k
+  KERNEL_SIZE := 4096k
+  DEVICE_VENDOR := COMFAST
+  DEVICE_MODEL := CF-AC101
+  DEVICE_PACKAGES := -uboot-envtools
+  KERNEL := kernel-bin | append-dtb | lzma | loader-kernel | uImage none | pad-to $$(KERNEL_SIZE)
+  KERNEL_INITRAMFS := kernel-bin | append-dtb | lzma | loader-kernel | uImage none
+  IMAGES += factory.bin
+  IMAGE/sysupgrade.bin := append-kernel | append-rootfs | pad-rootfs | \
+	check-size | append-metadata
+  IMAGE/factory.bin := append-kernel | append-rootfs | pad-rootfs | check-size
+endef
+TARGET_DEVICES += comfast_cf-ac101
+
 define Device/comfast_cf-e390ax
   $(Device/dsa-migration)
   $(Device/uimage-lzma-loader)
@@ -945,7 +962,7 @@ define Device/dlink_dir-2150-r1
   KERNEL := $$(KERNEL)
   IMAGES += factory.bin
   IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-ubi | \
-	check-size | sign-dlink-ru e6587b35a6b34e07bedeca23e140322f 
+	check-size | sign-dlink-ru e6587b35a6b34e07bedeca23e140322f
 endef
 TARGET_DEVICES += dlink_dir-2150-r1
 
@@ -1400,7 +1417,7 @@ define Device/gemtek_wvrtm-1xxacn
   IMAGE_SIZE := 122368k
   DEVICE_VENDOR := Gemtek
   DEVICE_PACKAGES := kmod-gpio-nxp-74hc164 kmod-spi-gpio \
-  kmod-usb3 -uboot-envtools 
+  kmod-usb3 -uboot-envtools
 endef
 
 define Device/gemtek_wvrtm-127acn
@@ -2428,7 +2445,7 @@ define Device/openfi_5pro
   $(Device/dsa-migration)
   IMAGE_SIZE := 65216k
   DEVICE_VENDOR := OpenFi
-  DEVICE_MODEL := 5Pro 
+  DEVICE_MODEL := 5Pro
   DEVICE_PACKAGES := kmod-mt7603 kmod-mt7615e kmod-mt7663-firmware-ap kmod-usb3 \
 	kmod-mmc-mtk
 endef
