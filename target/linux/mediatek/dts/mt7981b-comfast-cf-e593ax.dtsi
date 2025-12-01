@@ -8,13 +8,11 @@
 
 / {
 	aliases {
-		ethernet0 = &gmac1;
-		label-mac-device = &gmac0;
+		serial0 = &uart0;
 		led-boot = &led_blue;
 		led-failsafe = &led_red;
 		led-running = &led_green;
 		led-upgrade = &led_green;
-		serial0 = &uart0;
 	};
 
 	chosen: chosen {
@@ -136,9 +134,10 @@
 						reg = <0x0 0x1000>;
 					};
 
-					macaddr_factory_24: macaddr@24 {
-						reg = <0x24 0x6>;
+					macaddr_factory_e000: macaddr@e000 {
 						compatible = "mac-base";
+						reg = <0xe000 0x6>;
+						#nvmem-cell-cells = <1>;
 					};
 				};
 			};
@@ -156,9 +155,6 @@
 	an8801sb: ethernet-phy@30 {
 		reg = <30>;
 		compatible = "ethernet-phy-idc0ff.0421";
-		phy-mode = "sgmii";
-		full-duplex;
-		pause;
 		airoha,surge = <0>;
 		airoha,polarity = <2>;
 	};
@@ -170,19 +166,24 @@
 	status = "okay";
 
 	gmac0: mac@0 {
+		/* LAN */
 		compatible = "mediatek,eth-mac";
 		reg = <0>;
 		phy-mode = "sgmii";
 		phy-handle = <&an8801sb>;
+		managed = "in-band-status";
+		nvmem-cells = <&macaddr_factory_e000 0>;
 		nvmem-cell-names = "mac-address";
-		nvmem-cells = <&macaddr_factory_24>;
 	};
 
 	gmac1: mac@1 {
+		/* WAN */
 		compatible = "mediatek,eth-mac";
 		reg = <1>;
 		phy-mode = "gmii";
 		phy-handle = <&int_gbe_phy>;
+		nvmem-cells = <&macaddr_factory_e000 1>;
+		nvmem-cell-names = "mac-address";
 	};
 };
 
