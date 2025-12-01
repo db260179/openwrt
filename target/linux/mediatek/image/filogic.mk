@@ -610,12 +610,12 @@ define Device/cmcc_rax3000m
 endef
 TARGET_DEVICES += cmcc_rax3000m
 
-define Device/comfast_cf-e393ax
+define Device/comfast_cf-e393ax-stock
   DEVICE_VENDOR := COMFAST
-  DEVICE_MODEL := CF-E393AX
+  DEVICE_MODEL := CF-E393AX (oem layout)
   DEVICE_ALT0_VENDOR := COMFAST
-  DEVICE_ALT0_MODEL := CF-E395AX
-  DEVICE_DTS := mt7981a-comfast-cf-e393ax
+  DEVICE_ALT0_MODEL := CF-E395AX (oem layout)
+  DEVICE_DTS := mt7981a-comfast-cf-e393ax-stock
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
   KERNEL = kernel-bin | lzma | \
@@ -631,12 +631,46 @@ define Device/comfast_cf-e393ax
   IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
-TARGET_DEVICES += comfast_cf-e393ax
+TARGET_DEVICES += comfast_cf-e393ax-stock
 
-define Device/comfast_cf-e593ax
+define Device/comfast_cf-e393ax-ubootmod
   DEVICE_VENDOR := COMFAST
-  DEVICE_MODEL := CF-E593AX
-  DEVICE_DTS := mt7981b-comfast-cf-e593ax
+  DEVICE_MODEL := CF-E393AX (OpenWrt U-Boot layout)
+  DEVICE_ALT0_VENDOR := COMFAST
+  DEVICE_ALT0_MODEL := CF-E395AX (OpenWrt U-Boot layout)
+  DEVICE_DTS := mt7981a-comfast-cf-e393ax-ubootmod
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  KERNEL = kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS = kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 65536k
+  KERNEL_IN_UBI := 1
+  UBOOTENV_IN_UBI := 1
+  IMAGES := sysupgrade.itb
+  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
+  KERNEL := kernel-bin | gzip
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGE/sysupgrade.itb := append-kernel | \
+       fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | append-metadata
+  ARTIFACTS := preloader.bin bl31-uboot.fip
+  ARTIFACT/preloader.bin := mt7981-bl2 spim-nand-ddr3
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot comfast_cf-e393ax
+  IMAGES := sysupgrade.bin factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += comfast_cf-e393ax-ubootmod
+
+define Device/comfast_cf-e593ax-stock
+  DEVICE_VENDOR := COMFAST
+  DEVICE_MODEL := CF-E593AX (oem layout)
+  DEVICE_DTS := mt7981b-comfast-cf-e593ax-stock
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
   KERNEL = kernel-bin | lzma | \
@@ -652,7 +686,39 @@ define Device/comfast_cf-e593ax
   IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
-TARGET_DEVICES += comfast_cf-e593ax
+TARGET_DEVICES += comfast_cf-e593ax-stock
+
+define Device/comfast_cf-e593ax-ubootmod
+  DEVICE_VENDOR := COMFAST
+  DEVICE_MODEL := CF-E593AX (OpenWrt U-Boot layout)
+  DEVICE_DTS := mt7981b-comfast-cf-e593ax-ubootmod
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  KERNEL = kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS = kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 65536k
+  KERNEL_IN_UBI := 1
+  UBOOTENV_IN_UBI := 1
+  IMAGES := sysupgrade.itb
+  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
+  KERNEL := kernel-bin | gzip
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+       fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGE/sysupgrade.itb := append-kernel | \
+       fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | append-metadata
+  ARTIFACTS := preloader.bin bl31-uboot.fip
+  ARTIFACT/preloader.bin := mt7981-bl2 spim-nand-ddr3
+  ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot comfast_cf-e593ax
+  IMAGES := sysupgrade.bin factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += comfast_cf-e593ax-ubootmod
 
 define Device/confiabits_mt7981
   DEVICE_VENDOR := Confiabits

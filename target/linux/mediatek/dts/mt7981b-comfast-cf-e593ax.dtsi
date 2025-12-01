@@ -1,26 +1,29 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 
 /dts-v1/;
-
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
 #include <dt-bindings/leds/common.h>
 #include "mt7981.dtsi"
 
 / {
-	model = "COMFAST CF-E593AX";
-	compatible = "comfast,cf-e593ax", "mediatek,mt7981";
-
 	aliases {
-		serial0 = &uart0;
-		led-boot = &led_green;
-		led-failsafe = &led_green;
+		ethernet0 = &gmac1;
+		label-mac-device = &gmac0;
+		led-boot = &led_blue;
+		led-failsafe = &led_red;
 		led-running = &led_green;
 		led-upgrade = &led_green;
-		label-mac-device = &gmac1;
+		serial0 = &uart0;
 	};
 
-	chosen {
+	chosen: chosen {
 		bootargs-override = "console=ttyS0,115200n8";
 		stdout-path = "serial0:115200n8";
+	};
+
+	memory {
+		reg = <0 0x40000000 0 0x10000000>; // 256mb
 	};
 
 	gpio-keys {
@@ -83,7 +86,7 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 
-	flash@0 {
+	spi_nand: spi_nand@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "spi-nand";
@@ -103,7 +106,7 @@
 		mediatek,bmt-max-ratio = <1>;
 		mediatek,bmt-max-reserved-blocks = <64>;
 
-		partitions {
+		partitions: partitions {
 			compatible = "fixed-partitions";
 			#address-cells = <1>;
 			#size-cells = <1>;
@@ -133,12 +136,9 @@
 						reg = <0x0 0x1000>;
 					};
 
-					macaddr_wan: macaddr@2a {
-						reg = <0x2a 0x6>;
-					};
-
-					macaddr_lan: macaddr@24 {
+					macaddr_factory_24: macaddr@24 {
 						reg = <0x24 0x6>;
+						compatible = "mac-base";
 					};
 				};
 			};
@@ -148,25 +148,19 @@
 				reg = <0x380000 0x200000>;
 				read-only;
 			};
-
-			partition@580000 {
-				label = "ubi";
-				reg = <0x580000 0x4000000>;
-				compatible = "linux,ubi";
-			};
 		};
 	};
 };
 
 &mdio_bus {
-	reset-gpios = <&pio 39 GPIO_ACTIVE_LOW>;
-	reset-delay-us = <10000>;
-	reset-post-delay-us = <10000>;
-
-	en8801sc: ethernet-phy@24 {
-		reg = <24>;
-		compatible = "ethernet-phy-id03a2.9471";
+	an8801sb: ethernet-phy@30 {
+		reg = <30>;
+		compatible = "ethernet-phy-idc0ff.0421";
 		phy-mode = "sgmii";
+		full-duplex;
+		pause;
+		airoha,surge = <0>;
+		airoha,polarity = <2>;
 	};
 };
 
@@ -179,10 +173,9 @@
 		compatible = "mediatek,eth-mac";
 		reg = <0>;
 		phy-mode = "sgmii";
-		phy-handle = <&en8801sc>;
-		managed = "in-band-status";
-		nvmem-cells = <&macaddr_lan>;
+		phy-handle = <&an8801sb>;
 		nvmem-cell-names = "mac-address";
+		nvmem-cells = <&macaddr_factory_24>;
 	};
 
 	gmac1: mac@1 {
@@ -190,8 +183,6 @@
 		reg = <1>;
 		phy-mode = "gmii";
 		phy-handle = <&int_gbe_phy>;
-		nvmem-cells = <&macaddr_wan>;
-		nvmem-cell-names = "mac-address";
 	};
 };
 

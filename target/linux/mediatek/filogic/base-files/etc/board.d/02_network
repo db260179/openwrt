@@ -72,7 +72,6 @@ mediatek_setup_interfaces()
 		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 lan4 sfp2" "eth1 wan"
 		;;
 	bananapi,bpi-r3-mini|\
-	comfast,cf-e593ax|\
 	edgecore,eap111|\
 	huasifei,wh3000|\
 	huasifei,wh3000-pro)
@@ -82,7 +81,8 @@ mediatek_setup_interfaces()
 	bananapi,bpi-r4-poe)
 		ucidef_set_interfaces_lan_wan "lan1 lan2 lan3 eth1" "wan eth2"
 		;;
-	comfast,cf-e393ax)
+	comfast,cf-e393ax-stock|\
+	comfast,cf-e393ax-ubootmod)
 		ucidef_set_interfaces_lan_wan "lan1" eth1
 		;;
 	cudy,ap3000outdoor-v1|\
@@ -95,6 +95,8 @@ mediatek_setup_interfaces()
 	zyxel,nwa50ax-pro)
 		ucidef_set_interface_lan "eth0"
 		;;
+	comfast,cf-e593ax-stock|\
+	comfast,cf-e593ax-ubootmod|\
 	cudy,m3000-v1|\
 	cudy,tr3000-256mb-v1|\
 	cudy,tr3000-v1|\

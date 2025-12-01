@@ -71,6 +71,8 @@ platform_do_upgrade() {
 	bananapi,bpi-r3-mini|\
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-poe|\
+	comfast,cf-e393ax-ubootmod|\
+	comfast,cf-e593ax-ubootmod|\
 	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
 	cudy,tr3000-v1-ubootmod|\
