@@ -96,6 +96,8 @@
 	phy30: phy@30 {
 		compatible = "ethernet-phy-idc0ff.0421";
 		reg = <30>;
+		airoha,surge = <0>;
+		airoha,polarity = <2>;
 		reset-gpios = <&pio 39 GPIO_ACTIVE_LOW>;
 		reset-assert-us = <10000>;
 		reset-deassert-us = <10000>;

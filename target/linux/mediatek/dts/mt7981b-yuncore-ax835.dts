@@ -97,6 +97,13 @@
 	};
 };
 
+&hnat {
+	mtketh-wan = "wan";
+	mtketh-lan = "lan";
+	mtketh-max-gmac = <2>;
+	status = "okay";
+};
+
 &mdio_bus {
 	switch: switch@1f {
 		compatible = "mediatek,mt7531";
@@ -223,12 +230,12 @@
 
 		port@3 {
 			reg = <3>;
-			label = "lan";
+			label = "wan";
 		};
 
 		port@4 {
 			reg = <4>;
-			label = "wan";
+			label = "lan";
 
 			nvmem-cells = <&macaddr_factory_24 0>;
 			nvmem-cell-names = "mac-address";
