@@ -626,6 +626,7 @@ define KernelPackage/mt7981-firmware/install
 	cp \
 		$(PKG_BUILD_DIR)/firmware/mt7981_wa.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7981_wm.bin \
+    $(PKG_BUILD_DIR)/firmware/mt7981_wo.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7981_rom_patch.bin \
 		$(1)/lib/firmware/mediatek
 endef
