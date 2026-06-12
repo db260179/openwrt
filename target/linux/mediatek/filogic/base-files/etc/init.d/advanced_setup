@@ -5,8 +5,10 @@ USE_PROCD=1
 
 . /lib/functions.sh
 
+extra_command "reprobe_mt7915e" "Reprobe mt7915e to apply updated WED/ATF module options"
 
-smp-mt76() {
+
+smp_mt76() {
 OPTIMIZED_FOR="$1"
 CPU_LIST=`cat /proc/interrupts | sed -n '1p'`
 NUM_OF_CPU=0; for i in $CPU_LIST; do NUM_OF_CPU=`expr $NUM_OF_CPU + 1`; done;
@@ -274,7 +276,7 @@ MT7986()
 	logger -s "smp_affinity: CPU3_AFFINITY = $CPU3_AFFINITY"
 }
 
-gl-mt6000()
+gl_mt6000()
 {
 	num_of_wifi=$1
 	DEFAULT_RPS=0
@@ -451,7 +453,7 @@ MT7981()
 	logger -s "smp_affinity: CPU1_AFFINITY = $CPU1_AFFINITY"
 }
 
-gl-mt3000()
+gl_mt3000()
 {
 	num_of_wifi=$1
 	DEFAULT_RPS=0
@@ -556,13 +558,13 @@ setup_model()
 		MT7986 $num_of_wifi
 	elif [[ $board == *"gl-mt6000"* ]]; then
 		logger -s "smp_affinity: setup_model: gl-mt6000 NUM_WIFI_CARD=$num_of_wifi"
-		gl-mt6000 $num_of_wifi
+			gl_mt6000 $num_of_wifi
 	elif [[ $board == *"7981"* ]]; then
 		logger -s "smp_affinity: setup_model: MT7981 NUM_WIFI_CARD=$num_of_wifi"
 		MT7981 $num_of_wifi
 	elif [[ $board == *"gl-mt3000"* ]]; then
 		logger -s "smp_affinity: setup_model: gl-mt3000 NUM_WIFI_CARD=$num_of_wifi"
-		gl-mt3000 $num_of_wifi
+			gl_mt3000 $num_of_wifi
 	elif [[ $board == *"7622"* ]]; then
 		logger -s "smp_affinity: setup_model: MT7622 NUM_WIFI_CARD=$num_of_wifi"
 		MT7622 $num_of_wifi
@@ -622,13 +624,18 @@ set_rps_cpus()
 		var=${var//'.'/_}
 		eval cpu_map=\$$var
 		if [ -d /sys/class/net/$i ]; then
-			if [ ! -z $cpu_map ]; then
+			if [ -n "$cpu_map" ]; then
 				cpu_map=`printf '%x' $cpu_map`
-				logger -s "smp_affinity: echo $cpu_map > /sys/class/net/$i/queues/rx-0/rps_cpus"
-				echo $cpu_map > /sys/class/net/$i/queues/rx-0/rps_cpus
-			elif [ ! -z $1 ]; then
-				logger -s "smp_affinity: echo $1 > /sys/class/net/$i/queues/rx-0/rps_cpus"
-				echo $1 > /sys/class/net/$i/queues/rx-0/rps_cpus
+			elif [ -n "$1" ]; then
+				cpu_map="$1"
+			fi
+
+			if [ -n "$cpu_map" ]; then
+				for rxq in /sys/class/net/$i/queues/rx-*; do
+					[ -d "$rxq" ] || continue
+					logger -s "smp_affinity: echo $cpu_map > $rxq/rps_cpus"
+					echo $cpu_map > "$rxq/rps_cpus"
+				done
 			fi
 		fi
 	done
@@ -680,7 +687,7 @@ set_smp_affinity
 #end of file
 }
 
-mtk-offloading()
+mtk_offloading()
 {
 	mtk_offloading_enable=$(uci get advanced.@defaults[0].mtk_offloading_enable 2>/dev/null || echo "x")
 	if [ "$mtk_offloading_enable" == "1" ]; then
@@ -708,22 +715,144 @@ mtk-offloading()
 	fi
 }
 
-hw-atf-setup()
+load_mt7915e_from_modules_file()
+{
+	local module_file="/etc/modules.d/mt7915e"
+	local modline
+
+	[ -e "$module_file" ] || return 1
+
+	modline=$(cat "$module_file" 2>/dev/null)
+	[ -n "$modline" ] || modline="mt7915e"
+
+	set -- $modline
+	/sbin/modprobe "$@"
+}
+
+wait_for_mt7915e_runtime()
+{
+	local tries=0
+
+	while [ "$tries" -lt 10 ]; do
+		[ -e /sys/module/mt7915e/parameters/wed_enable ] && return 0
+		sleep 1
+		tries=$((tries + 1))
+	done
+
+	return 1
+}
+
+reprobe_mt7915e()
+{
+	local reprobe_ok=0
+
+	logger -t advanced_setup "reprobing mt7915e to apply module option changes"
+
+	/sbin/wifi down >/dev/null 2>&1
+	sleep 2
+
+	if grep -q '^mt7915e ' /proc/modules 2>/dev/null; then
+		if ! /sbin/modprobe -r mt7915e >/dev/null 2>&1 && \
+		   ! /sbin/rmmod mt7915e >/dev/null 2>&1; then
+			logger -t advanced_setup "failed to unload mt7915e; attempting to restore Wi-Fi"
+			/sbin/wifi up >/dev/null 2>&1
+			return 1
+		fi
+	fi
+
+	sleep 2
+
+	if ! load_mt7915e_from_modules_file >/dev/null 2>&1; then
+		logger -t advanced_setup "failed to reload mt7915e from /etc/modules.d/mt7915e"
+	else
+		reprobe_ok=1
+	fi
+
+	if [ "$reprobe_ok" -eq 1 ] && ! wait_for_mt7915e_runtime; then
+		logger -t advanced_setup "mt7915e runtime files not ready after reprobe"
+		reprobe_ok=0
+	fi
+
+	/sbin/wifi up >/dev/null 2>&1
+	sleep 3
+
+	if [ "$reprobe_ok" -ne 1 ]; then
+		logger -t advanced_setup "mt7915e reprobe incomplete; Wi-Fi bring-up attempted as fallback"
+		return 1
+	fi
+
+	smp_mt76
+	hw_atf_setup
+
+	logger -t advanced_setup "mt7915e reprobe completed"
+	return 0
+}
+
+sync_mt7915e_airtime_module_options()
+{
+	MODULE_FILE="/etc/modules.d/mt7915e"
+	atf=$(uci get advanced.@defaults[0].atf_enable 2>/dev/null || echo "0")
+	hwatf=$(uci get advanced.@defaults[0].hw_atf_enable 2>/dev/null || echo "0")
+
+	if [ "$atf" != "1" ] && [ "$hwatf" = "1" ]; then
+		logger -t advanced_setup "HW-ATF requires ATF; forcing hw_atf_enable=0"
+		uci set advanced.@defaults[0].hw_atf_enable='0'
+		uci commit advanced
+		hwatf=0
+	fi
+
+	if [ -e "$MODULE_FILE" ]; then
+		old_content=$(cat "$MODULE_FILE" 2>/dev/null)
+		new_line="mt7915e"
+
+		set -- $old_content
+		for token in "$@"; do
+			case "$token" in
+				mt7915e|expose_airtime_fairness=*)
+					;;
+				*)
+					case " $new_line " in
+						*" $token "*)
+							;;
+						*)
+							new_line="$new_line $token"
+							;;
+					esac
+					;;
+			esac
+		done
+
+		if [ "$atf" = "1" ]; then
+			new_line="$new_line expose_airtime_fairness=0"
+		fi
+
+		if [ "$old_content" != "$new_line" ]; then
+			printf '%s\n' "$new_line" > "$MODULE_FILE"
+			logger -t advanced_setup "updated $MODULE_FILE to '$new_line'; mt7915e reprobe required for Airtime Fairness mode change"
+			echo "1"
+			return 0
+		fi
+	fi
+
+	echo "0"
+}
+
+hw_atf_setup()
 {
 	FILE="/sys/kernel/debug/ieee80211/phy0/mt76/vow"
+	sync_mt7915e_airtime_module_options >/dev/null
+
 	if [ -e "$FILE" ]; then
 		logger -s "smp_affinity: HW-ATF available"
-		atf=$(uci get advanced.@defaults[0].atf_enable 2>/dev/null || echo "x")
-		hwatf=$(uci get advanced.@defaults[0].hw_atf_enable 2>/dev/null || echo "x")
-		if [ $atf == 1 ]; then
+		if [ "$atf" = "1" ]; then
 			echo 'vow_atf_en=1' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
-		elif [ $atf == 0 ]; then
+		else
 			echo 'vow_atf_en=0' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
 		fi
 		
-		if [ $hwatf == 1 ]; then
+		if [ "$atf" = "1" ] && [ "$hwatf" = "1" ]; then
 			echo 'vow_watf_en=1' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
-		elif [ $hwatf == 0 ]; then
+		else
 			echo 'vow_watf_en=0' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
 		fi
 		echo 'show_vow_info' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
@@ -747,7 +876,7 @@ enable-HQoS()
 }
 
 service_triggers() {
-    procd_add_reload_trigger advanced
+    procd_add_reload_trigger advanced network
 }
 
 start_service() {
@@ -757,9 +886,9 @@ start_service() {
 		sleep $delay
 		echo 1 > /tmp/smp_affinity_started
 	fi
-	smp-mt76
-	enable-HQoS
-	hw-atf-setup
+		smp_mt76
+		enable-HQoS
+		hw_atf_setup
     logger -t advanced_setup "advanced_setup finished"
 }
 
@@ -768,8 +897,16 @@ reload_service() {
     case "$trigger" in
         atf)
 			logger -t advanced_setup "advanced_setup atf"
-            hw_atf_setup
+			if [ "$(sync_mt7915e_airtime_module_options)" = "1" ]; then
+				reprobe_mt7915e
+			else
+				hw_atf_setup
+			fi
             ;;
+        wed)
+			logger -t advanced_setup "advanced_setup wed"
+			reprobe_mt7915e
+			;;
         *)
 			logger -t advanced_setup "advanced_setup generic"
 			if [ ! -f /tmp/smp_affinity_started ]; then
@@ -778,9 +915,9 @@ reload_service() {
 				sleep $delay
 				echo 1 > /tmp/smp_affinity_started
 			fi
-			smp-mt76
-			enable-HQoS
-			hw-atf-setup
+				smp_mt76
+				enable-HQoS
+				hw_atf_setup
 			logger -t advanced_setup "advanced_setup finished"
             ;;
     esac
