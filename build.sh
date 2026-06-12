@@ -113,13 +113,13 @@ build-custom () {
 build-rebuild () {
     make defconfig
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y clean world 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
 }
 
 build-rebuild-ignore () {
     make defconfig
     echo "Start build and log to build.log - Ignoring build errors..."
-    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y clean world 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
 }
 
 clean-min () {
