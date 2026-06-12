@@ -3,8 +3,6 @@
 # Enable debugging if DEBUG is set to true
 if [ "${DEBUG}" == "true" ]; then
   set -x
-else
-  set -e
 fi
 
 # Default to automatic core calculation if not specified by the user
@@ -31,9 +29,10 @@ build-official () {
     target=$1
 
     if [ -z "$target" ]; then
-    echo "Please specify the build target when using 'build-official'."
-    echo "Usage: $0 build-official <target> [-j <cores>]"
-    echo "Example: $0 build-official ramips/mt7621 -j 4"
+    echo "Please specify the build target when using 'official'."
+    echo "Usage: $0 official <target> [-j <cores>]"
+    echo "Example: $0 official ramips/mt7621 -j 4"
+    echo "Example: $0 official mediatek/filogic -j 4"
     exit 1
     fi
 
@@ -150,9 +149,9 @@ case "$1" in
         clean-full
         ;;
     *)
-        echo "Usage: $0 {official|custom|rebuild|rebuild-ignore|clean-min|clean-full} [-j <cores>] [nodownload] [routerconf]" >&2
-        echo "build-official: specify target name .i.e. ramips/mt7621 {Openwrt standard config}" >&2
-        echo "build-custom: {Custom config}" >&2
+        echo "Usage: $0 {official|custom|rebuild|rebuild-ignore|clean-min|clean-full} <target> [-j <cores>] [nodownload] [routerconf]" >&2
+        echo "official: specify target name .i.e. ramips/mt7621, mediatek/filogic {Openwrt standard config}" >&2
+        echo "custom: {Custom config}" >&2
         echo "-j <cores>: Optional. Specify the number of cores for building." >&2
         echo "Optional: nodownload - No downloads of packages" >&2
         echo "Optional: routerconf - Get /etc/build.config from router" >&2
