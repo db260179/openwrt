@@ -44,7 +44,7 @@ build-official () {
     ./scripts/feeds install -a && ./scripts/feeds install -a
 
     echo "Copy Openwrt official config..."
-    release=$(grep -m1 '$(VERSION_REPO),' include/version.mk |  -F, '{ print $3 }' | sed 's/[)]//g')
+    release=$(grep -m1 '$(VERSION_REPO),' include/version.mk | awk -F, '{print $3}' | tr -d ')')
 
     wget $release/targets/$target/config.buildinfo -O .config
 
