@@ -1,6 +1,6 @@
-From ad478005e71cba56629b5b572f54f515f3d436ff Mon Sep 17 00:00:00 2001
+From 4a3001822a652050f796bb5ff8c4e888763a8983 Mon Sep 17 00:00:00 2001
 From: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
-Date: Wed, 19 Mar 2025 17:21:16 +0800
+Date: Mon, 22 Sep 2025 11:12:05 +0800
 Subject: [PATCH] net: ethernet: mtk_eth_soc: convert cap_bit in mtk_eth_muxc
  struct to u64
 
@@ -12,6 +12,8 @@ Signed-off-by: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
  drivers/net/ethernet/mediatek/mtk_eth_path.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_path.c b/drivers/net/ethernet/mediatek/mtk_eth_path.c
+index 3f4f4cf..079abbb 100644
 --- a/drivers/net/ethernet/mediatek/mtk_eth_path.c
 +++ b/drivers/net/ethernet/mediatek/mtk_eth_path.c
 @@ -14,7 +14,7 @@
@@ -23,3 +25,6 @@ Signed-off-by: Bo-Cun Chen <bc-bocun.chen@mediatek.com>
  	int		(*set_path)(struct mtk_eth *eth, u64 path);
  };
  
+-- 
+2.45.2
+

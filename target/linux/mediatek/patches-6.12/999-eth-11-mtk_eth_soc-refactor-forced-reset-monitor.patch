@@ -10,7 +10,7 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: refactor forced reset monitor
 
 --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
 +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -2765,12 +2765,12 @@ static int mtk_poll_tx(struct mtk_eth *e
+@@ -2760,12 +2760,12 @@ static int mtk_poll_tx(struct mtk_eth *e
  
  static void mtk_handle_status_irq(struct mtk_eth *eth)
  {
@@ -25,7 +25,7 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: refactor forced reset monitor
  	}
  }
  
-@@ -3806,7 +3806,7 @@ static void mtk_dma_free(struct mtk_eth
+@@ -3794,7 +3794,7 @@ static void mtk_dma_free(struct mtk_eth
  
  static bool mtk_hw_reset_check(struct mtk_eth *eth)
  {
@@ -34,7 +34,7 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: refactor forced reset monitor
  
  	return (val & MTK_FE_INT_FQ_EMPTY) || (val & MTK_FE_INT_RFIFO_UF) ||
  	       (val & MTK_FE_INT_RFIFO_OV) || (val & MTK_FE_INT_TSO_FAIL) ||
-@@ -4536,80 +4536,232 @@ static void mtk_hw_warm_reset(struct mtk
+@@ -4560,80 +4560,232 @@ static void mtk_hw_warm_reset(struct mtk
  			val, rst_mask);
  }
  
@@ -333,7 +333,7 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: refactor forced reset monitor
  /* QDMA Interrupt grouping registers */
  #define MTK_RLS_DONE_INT	BIT(0)
  
-@@ -709,6 +710,12 @@
+@@ -710,6 +711,12 @@
  #define MTK_FE_DROP_FC		0x248
  #define MTK_FE_DROP_PPE		0x24C
  
@@ -345,8 +345,8 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: refactor forced reset monitor
 +
  #define MTK_MAC_FSM(x)		(0x1010C + ((x) * 0x100))
  
- struct mtk_rx_dma {
-@@ -949,6 +956,12 @@ enum mtk_pse_port {
+ #if !defined(CONFIG_NET_MEDIATEK_HNAT) && !defined(CONFIG_NET_MEDIATEK_HNAT_MODULE)
+@@ -991,6 +998,12 @@ enum mtk_pse_port {
  	PSE_PORT_MAX
  };
  
@@ -359,10 +359,10 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: refactor forced reset monitor
  /* GMAC Identifier */
  enum mtk_gmac_id {
  	MTK_GMAC1_ID = 0,
-@@ -1502,10 +1515,21 @@ struct mtk_eth {
- 
+@@ -1545,10 +1558,21 @@ struct mtk_eth {
  	struct {
  		struct delayed_work monitor_work;
+ 		atomic_t force;
 -		u32 wdidx;
 -		u8 wdma_hang_count;
 +		u32 wdidx[3];
