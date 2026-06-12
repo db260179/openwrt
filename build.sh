@@ -30,19 +30,40 @@ arguments=("$@")
 
 # --- HELPER FUNCTIONS ---
 
+get_build_version() {
+    local num rev
+
+    num=$(grep '^CONFIG_VERSION_NUMBER=' .config 2>/dev/null | cut -d= -f2 | tr -d '"')
+
+    # If blank, pull the hardcoded fallback from version.mk (e.g. 25.12-SNAPSHOT)
+    if [ -z "$num" ]; then
+        num=$(grep -o '[0-9]\+\.[0-9]\+-SNAPSHOT' include/version.mk 2>/dev/null | head -1)
+        [ -z "$num" ] && num="unknown"
+    fi
+
+    rev=$(./scripts/getver.sh 2>/dev/null)
+
+    if [ -n "$rev" ]; then
+        echo "${num}-${rev}"
+    else
+        echo "$num"
+    fi
+}
+
 notify() {
     local status=$1
     local duration=$2
     local build_type=$3
+    local build_version=$4
     local build_host=$(hostname)
     local finish_time=$(date "+%Y-%m-%d %H:%M:%S") # Captures current local time
 
     # Telegram message (URL-encoded %0A for newlines)
-    local msg="🚀 *OpenWrt Build Report*%0A*Host:* $build_host%0A*Target:* $build_type%0A*Status:* $status%0A*Duration:* $duration%0A*Finished:* $finish_time"
+    local msg="🚀 *OpenWrt Build Report*%0A*Host:* $build_host%0A*Target:* $build_type%0A*Version:* $build_version%0A*Status:* $status%0A*Duration:* $duration%0A*Finished:* $finish_time"
 
     # Discord Notification
     if [ -n "$DISCORD_WEBHOOK" ]; then
-        local discord_msg="{\"content\": \"🚀 **OpenWrt Build Report**\n**Host:** $build_host\n**Target:** $build_type\n**Status:** $status\n**Duration:** $duration\n**Finished:** $finish_time\"}"
+        local discord_msg="{\"content\": \"🚀 **OpenWrt Build Report**\n**Host:** $build_host\n**Target:** $build_type\n**Version:** $build_version\n**Status:** $status\n**Duration:** $duration\n**Finished:** $finish_time\"}"
         curl -H "Content-Type: application/json" -X POST -d "$discord_msg" "$DISCORD_WEBHOOK" > /dev/null 2>&1
     fi
 
@@ -65,16 +86,17 @@ run_build_logic() {
     local exit_code=${PIPESTATUS[0]}
     local end_time=$(date +%s)
     local duration=$(( (end_time - start_time) / 60 ))
+    local build_version=$(get_build_version)
 
     if [ $exit_code -eq 0 ]; then
-        notify "✅ SUCCESS" "${duration} min" "$type_label"
+        notify "✅ SUCCESS" "${duration} min" "$type_label" "$build_version"
         echo "-------------------------------------------------------"
-        echo "BUILD SUCCESSFUL (${duration} min)"
+        echo "BUILD SUCCESSFUL (${duration} min) [$build_version]"
         echo "-------------------------------------------------------"
     else
-        notify "❌ FAILED" "${duration} min" "$type_label"
+        notify "❌ FAILED" "${duration} min" "$type_label" "$build_version"
         echo "-------------------------------------------------------"
-        echo "BUILD FAILED (${duration} min). Check build.log for errors."
+        echo "BUILD FAILED (${duration} min) [$build_version]. Check build.log for errors."
         echo "-------------------------------------------------------"
         exit 1
     fi
