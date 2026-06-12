@@ -59,7 +59,7 @@ build-official () {
     fi
 
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y clean world 2>&1 | tee build.log
 }
 
 build-custom () {
@@ -107,19 +107,19 @@ build-custom () {
     fi
 
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y clean world 2>&1 | tee build.log
 }
 
 build-rebuild () {
-    make dirclean
     make defconfig
     echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y clean world 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
 }
 
 build-rebuild-ignore () {
+    make defconfig
     echo "Start build and log to build.log - Ignoring build errors..."
-    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y clean world 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
 }
 
 clean-min () {
@@ -131,16 +131,16 @@ clean-full () {
 }
 
 case "$1" in
-    build-official)
+    official)
         build-official "$2"
         ;;
-    build-custom)
+    custom)
         build-custom
         ;;
-    build-rebuild)
+    rebuild)
         build-rebuild
         ;;
-    build-rebuild-ignore)
+    rebuild-ignore)
         build-rebuild-ignore
         ;;
     clean-min)
@@ -150,7 +150,7 @@ case "$1" in
         clean-full
         ;;
     *)
-        echo "Usage: $0 {build-official|build-custom|build-rebuild|build-rebuild-ignore|clean-min|clean-full} [-j <cores>] [nodownload] [routerconf]" >&2
+        echo "Usage: $0 {official|custom|rebuild|rebuild-ignore|clean-min|clean-full} [-j <cores>] [nodownload] [routerconf]" >&2
         echo "build-official: specify target name .i.e. ramips/mt7621 {Openwrt standard config}" >&2
         echo "build-custom: {Custom config}" >&2
         echo "-j <cores>: Optional. Specify the number of cores for building." >&2
