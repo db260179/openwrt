@@ -1250,6 +1250,23 @@ endef
 
 $(eval $(call KernelPackage,r8169))
 
+define KernelPackage/mtk-eth
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=MediaTek Ethernet SDK Support
+  DEPENDS:=@TARGET_mediatek +kmod-libphy +kmod-nf-flow +kmod-nf-conntrack
+  KCONFIG:= \
+	CONFIG_NET_MEDIATEK_SOC \
+	CONFIG_NET_MEDIATEK_STAR_EMAC=n
+  FILES:= \
+	$(LINUX_DIR)/drivers/net/ethernet/mediatek/mtk_eth.ko
+  AUTOLOAD:=$(call AutoProbe,mtk_eth)
+endef
+
+define KernelPackage/mtk-eth/description
+  This package contains the Ethernet driver for MediaTek built-in Ethernet.
+endef
+
+$(eval $(call KernelPackage,mtk-eth))
 
 define KernelPackage/ne2k-pci
   SUBMENU:=$(NETWORK_DEVICES_MENU)
