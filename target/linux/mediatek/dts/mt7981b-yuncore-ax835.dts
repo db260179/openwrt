@@ -97,13 +97,6 @@
 	};
 };
 
-&hnat {
-	mtketh-wan = "wan";
-	mtketh-lan = "lan";
-	mtketh-max-gmac = <2>;
-	status = "okay";
-};
-
 &mdio_bus {
 	switch: switch@1f {
 		compatible = "mediatek,mt7531";
