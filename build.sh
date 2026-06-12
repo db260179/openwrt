@@ -3,19 +3,16 @@
 # --- CONFIGURATION (SECURE) ---
 # Load secrets from a local file if it exists.
 # This file should be added to your .gitignore.
+if [ -f ".build_env" ]; then
+    source .build_env
+fi
+
 # --- CONFIGURATION (Fill these in to enable notifications) ---
 # Discord Webhook URL
 #DISCORD_WEBHOOK=""
 # Telegram Settings (Bot Token and Chat ID)
 #TELEGRAM_TOKEN=""
 #TELEGRAM_CHAT_ID=""
-# -------------------------------------------------------------
-if [ -f ".build_env" ]; then
-    source .build_env
-fi
-
-# Fallback: If variables aren't in the file, the script will
-# naturally use variables already exported in your shell (env).
 # ------------------------------
 
 if [ "${DEBUG}" == "true" ]; then set -x; fi
@@ -63,7 +60,6 @@ run_build_logic() {
 
     echo "Starting build: $type_label with $num_cores cores..."
 
-    # PIPESTATUS[0] catches the exit code of 'make', not 'tee'
     make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y world 2>&1 | tee build.log
 
     local exit_code=${PIPESTATUS[0]}
@@ -91,7 +87,6 @@ prepare_feeds() {
 
 build_toolchain_safe() {
     echo "Pre-building Toolchain (Safety Step)..."
-    # Using 'tee -a' to append toolchain logs to the main build.log
     make tools/install -j${num_cores} || make tools/install -j1 V=s 2>&1 | tee -a build.log
     make toolchain/install -j${num_cores} || make toolchain/install -j1 V=s 2>&1 | tee -a build.log
 }
@@ -137,10 +132,9 @@ build-custom () {
     fi
 
     if [ -f "Custom.config" ]; then
-        echo "Copying Custom Openwrt config..."
         cp Custom.config .config
     else
-        echo "Custom.config does not exist! Please copy your custom config first!"
+        echo "Custom.config does not exist!"
         exit 1
     fi
 
@@ -152,20 +146,48 @@ build-custom () {
     run_build_logic "Custom-Build"
 }
 
+build-rebuild () {
+    make defconfig
+    echo "Start build and log to build.log"
+    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+}
+
+build-rebuild-ignore () {
+    make defconfig
+    echo "Start build and log to build.log - Ignoring build errors..."
+    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+}
+
+clean-min () {
+    echo "Cleaning: dirclean..."
+    make dirclean
+}
+
+clean-full () {
+    echo "Cleaning: distclean (Full)..."
+    make distclean
+}
+
 case "$1" in
-    official) build-official "$2" ;;
-    custom) build-custom ;;
-    rebuild) run_build_logic "Incremental-Rebuild" ;;
-    clean-min) make clean ;;
-    clean-toolchain) make dirclean ;;
-    clean-full) make distclean ;;
+    official)         build-official "$2" ;;
+    custom)           build-custom ;;
+    rebuild)          build-rebuild ;;
+    rebuild-ignore)   build-rebuild-ignore ;;
+    clean-min)        clean-min ;;
+    clean-toolchain)  make dirclean ;; # Kept for backward compatibility
+    clean-full)       clean-full ;;
     *)
-        echo "Usage: $0 {official|custom|rebuild|clean-min|clean-toolchain|clean-full} <target> [-j cores] [nodownload] [routerconf]"
-        echo "official: specify target name .i.e. ramips/mt7621, mediatek/filogic {Openwrt standard config}" >&2
-        echo "custom: {Custom config}" >&2
-        echo "-j <cores>: Optional. Specify the number of cores for building." >&2
-        echo "Optional: nodownload - No downloads of packages" >&2
-        echo "Optional: routerconf - Get /etc/build.config from router" >&2
+        echo "Usage: $0 {official|custom|rebuild|rebuild-ignore|clean-min|clean-full} <target> [-j cores] [nodownload] [routerconf]"
+        echo "------------------------------------------------------------------------------------------------"
+        echo "official:       Specify target (e.g., ramips/mt7621) using standard OpenWrt config."
+        echo "custom:         Uses Custom.config."
+        echo "rebuild:        Run make defconfig and incremental build with error filtering."
+        echo "rebuild-ignore: Same as rebuild but continues past errors (-i)."
+        echo "clean-min:      Runs 'make dirclean'."
+        echo "clean-full:     Runs 'make distclean' (Caution: wipes everything!)."
+        echo "-j <cores>:     Specify number of CPU cores."
+        echo "nodownload:     Skip downloading package sources."
+        echo "routerconf:     Fetch config from a live router."
         exit 1
         ;;
 esac
