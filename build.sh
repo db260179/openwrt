@@ -37,15 +37,19 @@ notify() {
     local status=$1
     local duration=$2
     local build_type=$3
-    local msg="🚀 *OpenWrt Build Report*%0A*Target:* $build_type%0A*Status:* $status%0A*Duration:* $duration"
+    local build_host=$(hostname)
+    local finish_time=$(date "+%Y-%m-%d %H:%M:%S") # Captures current local time
 
-    # Discord Notification (Uses $DISCORD_WEBHOOK from local env)
+    # Telegram message (URL-encoded %0A for newlines)
+    local msg="🚀 *OpenWrt Build Report*%0A*Host:* $build_host%0A*Target:* $build_type%0A*Status:* $status%0A*Duration:* $duration%0A*Finished:* $finish_time"
+
+    # Discord Notification
     if [ -n "$DISCORD_WEBHOOK" ]; then
-        local discord_msg="{\"content\": \"🚀 **OpenWrt Build Report**\n**Target:** $build_type\n**Status:** $status\n**Duration:** $duration\"}"
+        local discord_msg="{\"content\": \"🚀 **OpenWrt Build Report**\n**Host:** $build_host\n**Target:** $build_type\n**Status:** $status\n**Duration:** $duration\n**Finished:** $finish_time\"}"
         curl -H "Content-Type: application/json" -X POST -d "$discord_msg" "$DISCORD_WEBHOOK" > /dev/null 2>&1
     fi
 
-    # Telegram Notification (Uses $TELEGRAM_TOKEN and $TELEGRAM_CHAT_ID from local env)
+    # Telegram Notification
     if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
         curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
             -d "chat_id=$TELEGRAM_CHAT_ID" \
@@ -59,6 +63,7 @@ run_build_logic() {
 
     echo "Starting build: $type_label with $num_cores cores..."
 
+    # PIPESTATUS[0] catches the exit code of 'make', not 'tee'
     make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y world 2>&1 | tee build.log
 
     local exit_code=${PIPESTATUS[0]}
@@ -86,8 +91,9 @@ prepare_feeds() {
 
 build_toolchain_safe() {
     echo "Pre-building Toolchain (Safety Step)..."
-    make tools/install -j${num_cores} || make tools/install -j1 V=s 2>&1 | tee build.log
-    make toolchain/install -j${num_cores} || make toolchain/install -j1 V=s 2>&1 | tee build.log
+    # Using 'tee -a' to append toolchain logs to the main build.log
+    make tools/install -j${num_cores} || make tools/install -j1 V=s 2>&1 | tee -a build.log
+    make toolchain/install -j${num_cores} || make toolchain/install -j1 V=s 2>&1 | tee -a build.log
 }
 
 build-official () {
@@ -126,6 +132,7 @@ build-custom () {
         else
             echo "Something went wrong? Check username or hostname."
             echo "Check your build config has the /etc/build.config stored on the router."
+            exit 1
         fi
     fi
 
