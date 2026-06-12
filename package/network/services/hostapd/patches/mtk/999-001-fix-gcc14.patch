@@ -1,0 +1,11 @@
+--- a/hostapd/ctrl_iface.c
++++ b/hostapd/ctrl_iface.c
+@@ -4347,7 +4347,7 @@ hostapd_ctrl_iface_get_aval_color_bmp(st
+ 	end = buf + buflen;
+ 
+ 	ret = os_snprintf(buf, buflen,
+-			"available color bitmap=0x%llx\n",
++			"available color bitmap=0x%lx\n",
+ 			aval_color_bmp);
+ 	if (os_snprintf_error(end - pos, ret))
+ 		return pos - buf;
