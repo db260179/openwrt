@@ -307,9 +307,6 @@ mediatek_setup_macs()
 		wan_mac=$(mtd_get_mac_ascii Bdata ethaddr_wan)
 		label_mac=$wan_mac
 		;;
-	yuncore,ax835)
-		label_mac=$(mtd_get_mac_binary "Factory" 0x4)
-		;;
 	esac
 
 	[ -n "$lan_mac" ] && ucidef_set_interface_macaddr "lan" $lan_mac
