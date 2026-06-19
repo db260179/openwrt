@@ -182,6 +182,10 @@
 			"description": "BSS Transition Management",
 			"type": "boolean"
 		},
+		"bridge_isolate": {
+			"description": "Enable bridge port isolation for the wireless interface",
+			"type": "boolean"
+		},
 		"bssid": {
 			"description": "Override the BSSID of the network",
 			"type": "string"
@@ -755,6 +759,13 @@
 		},
 		"network": {
 			"description": "Specifies one or multiple logical network interfaces declared in the network configuration, each one should be a L3 bridge to be able to attach this L2 wireless interface.",
+			"type": "array",
+			"items": {
+				"type": "string"
+			}
+		},
+		"network_vlan": {
+			"description": "Make a wireless interface a tagged member of extra VLANs",
 			"type": "array",
 			"items": {
 				"type": "string"
