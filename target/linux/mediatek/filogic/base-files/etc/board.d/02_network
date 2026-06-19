@@ -126,7 +126,6 @@ mediatek_setup_interfaces()
 		;;
 	airpi,ap3000m|\
 	bananapi,bpi-r3-mini|\
-	comfast,cf-e593ax|\
 	edgecore,eap111|\
 	huasifei,wh3000|\
 	huasifei,wh3000-pro-emmc|\
@@ -134,6 +133,7 @@ mediatek_setup_interfaces()
 		ucidef_set_interfaces_lan_wan eth0 eth1
 		;;
 	bazis,ax3000wm|\
+	comfast,cf-e593ax|\
 	cudy,m3000-v1|\
 	cudy,m3000-v2-yt8821|\
 	cudy,tr3000-256mb-v1|\
