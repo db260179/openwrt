@@ -36,6 +36,9 @@ function set_fixed_freq(data, config) {
 
 	if (wildcard(data.htmode, 'VHT*'))
 		set_default(config, 'vht', 1);
+
+	if (config.mode in [ 'sta', 'adhoc', 'mesh' ])
+		set_default(config, 'noscan', true);
 }
 
 export function ratestr(rate) {
@@ -60,7 +63,7 @@ export function ratelist(rates) {
 function setup_sta(data, config) {
 	iface.parse_encryption(config);
 
-	if (config.auth_type in [ 'sae', 'owe', 'eap2', 'eap192' ])
+	if (config.auth_type in [ 'sae', 'owe', 'eap2', 'eap192', 'dpp' ])
 		config.ieee80211w = 2;
 	else if (config.auth_type in [ 'psk-sae' ] && !config.ieee80211w)
 		config.ieee80211w = 1;
@@ -121,6 +124,10 @@ function setup_sta(data, config) {
 		break;
 
 	case 'owe':
+		iface.wpa_key_mgmt(config);
+		break;
+
+	case 'dpp':
 		iface.wpa_key_mgmt(config);
 		break;
 
@@ -201,7 +208,11 @@ function setup_sta(data, config) {
 		'disable_ht', 'disable_ht40', 'disable_vht', 'vht', 'max_oper_chwidth',
 		'ht40', 'beacon_int', 'ieee80211w', 'rates', 'mesh_basic_rates', 'mcast_rate',
 		'altsubject_match', 'domain_match', 'domain_suffix_match',
-		'bssid_blacklist', 'bssid_whitelist', 'erp',
+		'bssid_blacklist', 'bssid_whitelist', 'erp', 'ca_cert', 'identity',
+		'anonymous_identity', 'client_cert', 'private_key', 'private_key_passwd',
+		'subject_match', 'altsubject_match', 'domain_match', 'domain_suffix_match',
+		'ca_cert2', 'client_cert2', 'private_key2', 'private_key2_passwd', 'password',
+		'dpp_connector', 'dpp_csign', 'dpp_netaccesskey',
 	]);
 }
 
