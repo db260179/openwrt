@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Enable netfilter for bridged interfaces, so bridged IP traffic traverses the
+# netfilter forward chain where nft_flow_offload can pick it up for
+# hardware PPE offload.
+
+[ "$ACTION" = "add" ] || exit 0
+
+for bridge in /sys/class/net/*/bridge; do
+    [ -d "$bridge" ] || continue
+
+    for f in nf_call_iptables nf_call_ip6tables; do
+        [ -w "$bridge/$f" ] && echo 1 > "$bridge/$f"
+    done
+done
+
+exit 0
