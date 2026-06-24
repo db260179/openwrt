@@ -2,7 +2,7 @@ ARCH:=aarch64
 SUBTARGET:=filogic
 BOARDNAME:=Filogic 8x0 (MT798x)
 CPU_TYPE:=cortex-a53
-DEFAULT_PACKAGES += fitblk kmod-crypto-hw-safexcel wpad-basic-mbedtls uboot-envtools
+DEFAULT_PACKAGES += fitblk kmod-crypto-hw-safexcel wpad-mbedtls hostapd-utils uboot-envtools kmod-br-netfilter kmod-nft-bridge
 KERNELNAME:=Image dtbs
 DEFAULT_PROFILE:=openwrt_one
 
