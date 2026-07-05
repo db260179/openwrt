@@ -8,8 +8,8 @@ PKG_LICENSE_FILES:=
 
 PKG_SOURCE_URL:=https://github.com/db260179/mt76
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2026-06-22
-PKG_SOURCE_VERSION:=c8a8be6befb54ab3de7d9e2a6089c55b15900582
+PKG_SOURCE_DATE:=2026-06-28
+PKG_SOURCE_VERSION:=6710bdcec70a320c0165d270e810d8d4370ad905
 PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
@@ -640,6 +640,8 @@ define KernelPackage/mt7986-firmware/install
 		$(PKG_BUILD_DIR)/firmware/mt7986_wa.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7986_wm_mt7975.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7986_wm.bin \
+    $(PKG_BUILD_DIR)/firmware/mt7986_wo_0.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7986_wo_1.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7986_rom_patch_mt7975.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7986_rom_patch.bin \
 		$(1)/lib/firmware/mediatek
