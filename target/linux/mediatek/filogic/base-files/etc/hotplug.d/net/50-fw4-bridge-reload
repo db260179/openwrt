@@ -1,16 +1,5 @@
 #!/bin/sh
 
-# Install a hotplug script that reloads the firewall after WiFi
-# interfaces come up, so fw4 can discover them and add them to the
-# flowtable for hardware bridge offload via PPE.
-#
-# fw4 auto-discovers bridge member devices for the flowtable, but
-# at boot the firewall starts before hostapd creates WiFi interfaces.
-
-mkdir -p /etc/hotplug.d/net
-cat > /etc/hotplug.d/net/50-flow-offload-wifi <<'HOTPLUG'
-#!/bin/sh
-
 [ "$ACTION" = "add" ] || exit 0
 
 DEV="${DEVICENAME:-$INTERFACE}"
@@ -27,7 +16,7 @@ MODE=$(iwinfo "$DEV" info 2>/dev/null | sed -n 's/.*Mode: \([A-Za-z -]*\).*/\1/p
 [ "$MODE" = "Master" ] || exit 0
 
 in_flowtable() {
-	nft list flowtable inet fw4 ft 2>/dev/null | grep -qw "\"$DEV\""
+	nft list flowtable bridge fw4 fb 2>/dev/null | grep -qw "\"$DEV\""
 }
 
 # Skip if the device is already in the flowtable (fw4 picked it up).
@@ -54,9 +43,5 @@ in_flowtable && exit 0
 		logger -t flow-offload-wifi "firewall reload failed for $DEV"
 	fi
 ) &
-
-exit 0
-HOTPLUG
-chmod +x /etc/hotplug.d/net/50-flow-offload-wifi
 
 exit 0
