@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# Install a hotplug script that reloads the firewall after WiFi
+# interfaces come up, so fw4 can discover them and add them to the
+# flowtable for hardware bridge offload via PPE.
+#
+# fw4 auto-discovers bridge member devices for the flowtable, but
+# at boot the firewall starts before hostapd creates WiFi interfaces.
+
+mkdir -p /etc/hotplug.d/net
+cat > /etc/hotplug.d/net/50-flow-offload-wifi <<'HOTPLUG'
+#!/bin/sh
+
+[ "$ACTION" = "add" ] || exit 0
+
+DEV="${DEVICENAME:-$INTERFACE}"
+[ -n "$DEV" ] || exit 0
+
+# Must be a wireless device. Works regardless of naming scheme
+# (phyN-apN on mac80211 dynamic naming, wlanN/athN/raN on legacy
+# drivers or static ifname= configs).
+[ -e "/sys/class/net/$DEV/phy80211" ] || [ -e "/sys/class/net/$DEV/wireless" ] || exit 0
+
+# Must be AP mode - skip STA/mesh/adhoc/monitor interfaces.
+# iwinfo reports AP mode as "Master".
+MODE=$(iwinfo "$DEV" info 2>/dev/null | sed -n 's/.*Mode: \([A-Za-z -]*\).*/\1/p')
+[ "$MODE" = "Master" ] || exit 0
+
+in_flowtable() {
+	nft list flowtable inet fw4 ft 2>/dev/null | grep -qw "\"$DEV\""
+}
+
+# Skip if the device is already in the flowtable (fw4 picked it up).
+in_flowtable && exit 0
+
+# fw4 auto-discovers bridge members on reload. Serialize via flock so
+# concurrent hotplug events don't trigger multiple reloads. Use a
+# blocking wait (not -n) so an interface that comes up while a reload
+# is already in progress still gets a follow-up reload instead of
+# being silently dropped.
+(
+	mkdir -p /var/lock
+	exec 9>/var/lock/flow-offload-wifi.lock
+	flock -w 10 9 || { logger -t flow-offload-wifi "timed out waiting for lock ($DEV)"; exit 0; }
+
+	# Another instance may have already reloaded and covered this device.
+	in_flowtable && exit 0
+
+	# Brief settle time so sibling AP interfaces also get included.
+	sleep 2
+	if /etc/init.d/firewall reload >/dev/null 2>&1; then
+		logger -t flow-offload-wifi "reloaded firewall, added $DEV to flowtable"
+	else
+		logger -t flow-offload-wifi "firewall reload failed for $DEV"
+	fi
+) &
+
+exit 0
+HOTPLUG
+chmod +x /etc/hotplug.d/net/50-flow-offload-wifi
+
+exit 0
