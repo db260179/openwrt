@@ -966,7 +966,7 @@ define Device/comfast_cf-e593ax
   DEVICE_MODEL := CF-E593AX
   DEVICE_DTS := mt7981b-comfast-cf-e593ax
   DEVICE_DTS_DIR := ../dts
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  DEVICE_PACKAGES := kmod-mt7915e kmod-phy-airoha-an8801sb kmod-mt7981-firmware mt7981-wo-firmware
   KERNEL = kernel-bin | lzma | \
        fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
   KERNEL_INITRAMFS = kernel-bin | lzma | \
