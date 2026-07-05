@@ -37,3 +37,4 @@ git-src
 .vscode*
 build.log
 Custom.config
+.build_env
