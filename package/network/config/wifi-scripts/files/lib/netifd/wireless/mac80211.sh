@@ -31,6 +31,7 @@ drv_mac80211_init_device_config() {
 	config_add_string distance
 	config_add_string ifname_prefix
 	config_add_string macaddr_base
+	config_add_string edcca_enable edcca_compensation edcca_threshold
 	config_add_int radio beacon_int chanbw frag rts
 	config_add_int rxantenna txantenna txpower min_tx_power
 	config_add_int num_global_macaddr multiple_bssid
@@ -151,7 +152,7 @@ mac80211_hostapd_setup_base() {
 		append base_cfg "acs_exclude_dfs=1" "$N"
 
 	json_get_vars noscan ht_coex vendor_vht min_tx_power:0 tx_burst
-	json_get_vars etxbfen:1 itxbfen lpi_enable:0 sku_idx:0 beacon_dup:1
+	json_get_vars etxbfen:1 itxbfen lpi_enable:0 sku_idx:0 beacon_dup:1 edcca_enable edcca_compensation edcca_threshold
 	json_get_values ht_capab_list ht_capab
 	json_get_values channel_list channels
 
@@ -503,25 +504,6 @@ mac80211_hostapd_setup_base() {
 			append base_cfg "he_twt_responder=$he_twt_responder" "$N"
 		fi
 
-		edcca_enable=$(uci get advanced.@edcca[0].edcca_enable 2>/dev/null || echo "1")
-		if [ -n "$edcca_enable" ]; then
-			append base_cfg "edcca_enable=$edcca_enable" "$N"
-		fi
-
-		edcca_compensation=$(uci get advanced.@edcca[0].compensation 2>/dev/null || echo "-6")
-		if [ -n "$edcca_compensation" ]; then
-			append base_cfg "edcca_compensation=$edcca_compensation" "$N"
-		fi
-
-		thres_0=$(uci get advanced.@edcca[0].thres_0 2>/dev/null || echo "-60")
-		thres_1=$(uci get advanced.@edcca[0].thres_1 2>/dev/null || echo "-62")
-		thres_2=$(uci get advanced.@edcca[0].thres_2 2>/dev/null || echo "-59")
-		thres_3=$(uci get advanced.@edcca[0].thres_3 2>/dev/null || echo "-54")
-		edcca_threshold="${thres_0} ${thres_1} ${thres_2} ${thres_3}"
-		if [ -n "$edcca_threshold" ]; then
-			append base_cfg "edcca_threshold=$edcca_threshold" "$N"
-		fi
-
 		if [ "$he_bss_color_enabled" -gt 0 ]; then
 			if !([ "$he_bss_color" -gt 0 ] && [ "$he_bss_color" -le 64 ]); then
 				rand=$(head -n 1 /dev/urandom | tr -dc 0-9 | head -c 2 | sed 's/^0*//')
@@ -575,6 +557,28 @@ mac80211_hostapd_setup_base() {
 			append base_cfg "eht_oper_centr_freq_seg0_idx=$eht_center_seg0" "$N"
 		}
 	fi
+
+	# EDCCA Configuration Block (Device/PHY wide, decoupled from 802.11ax logic)
+    [ -z "$edcca_enable" ] && edcca_enable=$(uci get advanced.@edcca[0].edcca_enable 2>/dev/null || echo "1")
+    if [ -n "$edcca_enable" ]; then
+        append base_cfg "edcca_enable=$edcca_enable" "$N"
+    fi
+
+    [ -z "$edcca_compensation" ] && edcca_compensation=$(uci get advanced.@edcca[0].compensation 2>/dev/null || echo "-6")
+    if [ -n "$edcca_compensation" ]; then
+        append base_cfg "edcca_compensation=$edcca_compensation" "$N"
+    fi
+
+    if [ -z "$edcca_threshold" ]; then
+        local thres_0=$(uci get advanced.@edcca[0].thres_0 2>/dev/null || echo "-60")
+        local thres_1=$(uci get advanced.@edcca[0].thres_1 2>/dev/null || echo "-62")
+        local thres_2=$(uci get advanced.@edcca[0].thres_2 2>/dev/null || echo "-59")
+        local thres_3=$(uci get advanced.@edcca[0].thres_3 2>/dev/null || echo "-54")
+        edcca_threshold="${thres_0} ${thres_1} ${thres_2} ${thres_3}"
+    fi
+    if [ -n "$edcca_threshold" ]; then
+        append base_cfg "edcca_threshold=$edcca_threshold" "$N"
+    fi
 
 	hostapd_prepare_device_config "$hostapd_conf_file" nl80211
 	cat >> "$hostapd_conf_file" <<EOF
