@@ -484,7 +484,7 @@ mac80211_hostapd_setup_base() {
 			append base_cfg "he_oper_chwidth=$vht_oper_chwidth" "$N"
 			append base_cfg "he_oper_centr_freq_seg0_idx=$vht_center_seg0" "$N"
 		}
-		
+
 		[ "$etxbfen" -eq 0 ] && {
 			he_su_beamformer=0
 			he_mu_beamformer=0
@@ -495,28 +495,29 @@ mac80211_hostapd_setup_base() {
 			he_su_beamformee:${he_phy_cap:8:2}:0x1:$he_su_beamformee \
 			he_mu_beamformer:${he_phy_cap:8:2}:0x2:$he_mu_beamformer \
 			he_twt_required:${he_mac_cap:0:2}:0x6:$he_twt_required
-			
+
 		if [ -n "$he_twt_responder" ]; then
 			append base_cfg "he_twt_responder=$he_twt_responder" "$N"
 		else
 			he_twt_responder=0
 			append base_cfg "he_twt_responder=$he_twt_responder" "$N"
 		fi
-		
+
 		edcca_enable=$(uci get advanced.@edcca[0].edcca_enable 2>/dev/null || echo "1")
 		if [ -n "$edcca_enable" ]; then
 			append base_cfg "edcca_enable=$edcca_enable" "$N"
 		fi
-		
+
 		edcca_compensation=$(uci get advanced.@edcca[0].compensation 2>/dev/null || echo "-6")
 		if [ -n "$edcca_compensation" ]; then
 			append base_cfg "edcca_compensation=$edcca_compensation" "$N"
 		fi
-		
+
 		thres_0=$(uci get advanced.@edcca[0].thres_0 2>/dev/null || echo "-60")
 		thres_1=$(uci get advanced.@edcca[0].thres_1 2>/dev/null || echo "-62")
 		thres_2=$(uci get advanced.@edcca[0].thres_2 2>/dev/null || echo "-59")
-		edcca_threshold="${thres_0} ${thres_1} ${thres_2}"
+		thres_3=$(uci get advanced.@edcca[0].thres_3 2>/dev/null || echo "-54")
+		edcca_threshold="${thres_0} ${thres_1} ${thres_2} ${thres_3}"
 		if [ -n "$edcca_threshold" ]; then
 			append base_cfg "edcca_threshold=$edcca_threshold" "$N"
 		fi
