@@ -326,7 +326,7 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
  static int wpa_driver_nl80211_leave_mesh(void *priv)
  {
  	struct i802_bss *bss = priv;
-@@ -15074,6 +15075,173 @@ wpa_driver_get_multi_hw_info(void *priv,
+@@ -15074,6 +15075,188 @@ wpa_driver_get_multi_hw_info(void *priv,
  	return nl80211_get_multi_hw_info(bss, num_multi_hws);
  }
  
@@ -346,6 +346,11 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
 +		return 0;
 +	}
 +
++	wpa_printf(MSG_INFO,
++		   "nl80211: request EDCCA enable=%u (%s) compensation=%d",
++		   edcca_enable, edcca_enable ? "auto" : "force-disable",
++		   edcca_compensation);
++
 +	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
 +	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
 +	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
@@ -364,6 +369,9 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
 +	if (ret) {
 +		wpa_printf(MSG_ERROR, "Failed to configure EDCCA enable. ret=%d (%s) ",
 +			   ret, strerror(-ret));
++	} else {
++		wpa_printf(MSG_INFO,
++			   "nl80211: EDCCA enable request accepted by driver");
 +	}
 +	return ret;
 +}
@@ -388,6 +396,10 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
 +		return 0;
 +	}
 +
++	wpa_printf(MSG_INFO,
++		   "nl80211: request EDCCA thresholds BW20=%d BW40=%d BW80=%d BW160=%d",
++		   threshold[0], threshold[1], threshold[2], threshold[3]);
++
 +	if (!(msg = nl80211_drv_msg(drv, 0, NL80211_CMD_VENDOR)) ||
 +	    nla_put_u32(msg, NL80211_ATTR_VENDOR_ID, OUI_MTK) ||
 +	    nla_put_u32(msg, NL80211_ATTR_VENDOR_SUBCMD,
@@ -407,6 +419,9 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
 +	if (ret) {
 +		wpa_printf(MSG_ERROR, "Failed to configure EDCCA threshold. ret=%d (%s) ",
 +			   ret, strerror(-ret));
++	} else {
++		wpa_printf(MSG_INFO,
++			   "nl80211: EDCCA threshold request accepted by driver");
 +	}
 +	return ret;
 +}
@@ -500,7 +515,7 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
  
  const struct wpa_driver_ops wpa_driver_nl80211_ops = {
  	.name = "nl80211",
-@@ -15248,4 +15416,8 @@ const struct wpa_driver_ops wpa_driver_n
+@@ -15248,4 +15431,8 @@ const struct wpa_driver_ops wpa_driver_n
  	.radio_disable = testing_nl80211_radio_disable,
  #endif /* CONFIG_TESTING_OPTIONS */
  	.get_multi_hw_info = wpa_driver_get_multi_hw_info,
@@ -534,11 +549,12 @@ edcca_enable and edcca_compensation and implement edcca related handlers.
  			wpa_printf(MSG_DEBUG, "nl80211: Supported vendor command: vendor_id=0x%x subcmd=%u",
 --- a/src/ap/ap_config.h
 +++ b/src/ap/ap_config.h
-@@ -1276,8 +1276,38 @@ struct hostapd_config {
+@@ -1276,8 +1276,39 @@ struct hostapd_config {
  
  	bool channel_usage;
  	bool peer_to_peer_twt;
 +
++	/* EDCCA Compensation */
 +	u8 edcca_enable;
 +	s8 edcca_compensation;
 +	int *edcca_threshold;
