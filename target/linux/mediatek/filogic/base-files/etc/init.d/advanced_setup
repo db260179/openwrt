@@ -5,7 +5,7 @@ USE_PROCD=1
 
 . /lib/functions.sh
 
-extra_command "runtime_atf" "Show runtime ATF/WATF state"
+extra_command "reprobe_mt7915e" "Reprobe mt7915e to apply updated WED/ATF module options"
 
 
 smp_mt76() {
@@ -715,121 +715,90 @@ mtk_offloading()
 	fi
 }
 
-mt7915e_module_has_token()
+load_mt7915e_from_modules_file()
 {
-	local module_file="$1"
-	local wanted="$2"
-	local token
+	local module_file="/etc/modules.d/mt7915e"
+	local modline
 
 	[ -e "$module_file" ] || return 1
 
-	set -- $(cat "$module_file" 2>/dev/null)
-	for token in "$@"; do
-		[ "$token" = "$wanted" ] && return 0
+	modline=$(cat "$module_file" 2>/dev/null)
+	[ -n "$modline" ] || modline="mt7915e"
+
+	set -- $modline
+	/sbin/modprobe "$@"
+}
+
+wait_for_mt7915e_runtime()
+{
+	local tries=0
+
+	while [ "$tries" -lt 10 ]; do
+		[ -e /sys/module/mt7915e/parameters/wed_enable ] && return 0
+		sleep 1
+		tries=$((tries + 1))
 	done
 
 	return 1
 }
 
-append_mt7915e_module_token()
+reprobe_mt7915e()
 {
-	local token="$1"
+	local reprobe_ok=0
 
-	case " $new_line " in
-		*" $token "*)
-			;;
-		*)
-			new_line="$new_line $token"
-			;;
-	esac
-}
+	logger -t advanced_setup "reprobing mt7915e to apply module option changes"
 
-sync_mt7915e_wed_module_options()
-{
-	MODULE_FILE="/etc/modules.d/mt7915e"
-	wed=$(uci -q get advanced.@defaults[0].wed_offloading 2>/dev/null)
+	/sbin/wifi down >/dev/null 2>&1
+	sleep 2
 
-	if [ -z "$wed" ]; then
-		if mt7915e_module_has_token "$MODULE_FILE" "wed_enable=1"; then
-			wed=1
-		else
-			wed=0
-		fi
-
-		uci set advanced.@defaults[0].wed_offloading="$wed" 2>/dev/null
-		uci commit advanced 2>/dev/null
-	fi
-
-	case "$wed" in
-		1|on|true|yes|enabled)
-			wed=1
-			;;
-		*)
-			wed=0
-			;;
-	esac
-
-	if [ -e "$MODULE_FILE" ]; then
-		old_content=$(cat "$MODULE_FILE" 2>/dev/null)
-		new_line="mt7915e"
-		wed_token_added=0
-
-		set -- $old_content
-		for token in "$@"; do
-			case "$token" in
-				mt7915e)
-					;;
-				wed_enable=*)
-					if [ "$wed" = "1" ] && [ "$wed_token_added" = "0" ]; then
-						append_mt7915e_module_token "wed_enable=1"
-						wed_token_added=1
-					fi
-					;;
-				*)
-					append_mt7915e_module_token "$token"
-					;;
-			esac
-		done
-
-		if [ "$wed" = "1" ] && [ "$wed_token_added" = "0" ]; then
-			append_mt7915e_module_token "wed_enable=1"
-		fi
-
-		if [ "$old_content" != "$new_line" ]; then
-			printf '%s\n' "$new_line" > "$MODULE_FILE"
-			logger -t advanced_setup "updated $MODULE_FILE to '$new_line'; reboot required for WED mode change"
-			echo "0"
-			return 0
+	if grep -q '^mt7915e ' /proc/modules 2>/dev/null; then
+		if ! /sbin/modprobe -r mt7915e >/dev/null 2>&1 && \
+		   ! /sbin/rmmod mt7915e >/dev/null 2>&1; then
+			logger -t advanced_setup "failed to unload mt7915e; attempting to restore Wi-Fi"
+			/sbin/wifi up >/dev/null 2>&1
+			return 1
 		fi
 	fi
 
-	if [ -e /sys/module/mt7915e/parameters/wed_enable ]; then
-		runtime_wed=$(cat /sys/module/mt7915e/parameters/wed_enable 2>/dev/null)
-		if { [ "$wed" = "1" ] && [ "$runtime_wed" != "Y" ]; } || \
-		   { [ "$wed" = "0" ] && [ "$runtime_wed" != "N" ]; }; then
-			logger -t advanced_setup "mt7915e runtime WED state '$runtime_wed' differs from UCI '$wed'; reboot required"
-			echo "0"
-			return 0
-		fi
+	sleep 2
+
+	if ! load_mt7915e_from_modules_file >/dev/null 2>&1; then
+		logger -t advanced_setup "failed to reload mt7915e from /etc/modules.d/mt7915e"
+	else
+		reprobe_ok=1
 	fi
 
-	echo "0"
+	if [ "$reprobe_ok" -eq 1 ] && ! wait_for_mt7915e_runtime; then
+		logger -t advanced_setup "mt7915e runtime files not ready after reprobe"
+		reprobe_ok=0
+	fi
+
+	/sbin/wifi up >/dev/null 2>&1
+	sleep 3
+
+	if [ "$reprobe_ok" -ne 1 ]; then
+		logger -t advanced_setup "mt7915e reprobe incomplete; Wi-Fi bring-up attempted as fallback"
+		return 1
+	fi
+
+	smp_mt76
+	hw_atf_setup
+
+	logger -t advanced_setup "mt7915e reprobe completed"
+	return 0
 }
 
 sync_mt7915e_airtime_module_options()
 {
 	MODULE_FILE="/etc/modules.d/mt7915e"
-	atf=$(uci -q get advanced.@defaults[0].atf_enable 2>/dev/null)
+	atf=$(uci get advanced.@defaults[0].atf_enable 2>/dev/null || echo "0")
+	hwatf=$(uci get advanced.@defaults[0].hw_atf_enable 2>/dev/null || echo "0")
 
-	if uci -q get advanced.@defaults[0].hw_atf_enable >/dev/null 2>&1; then
-		uci -q delete advanced.@defaults[0].hw_atf_enable
-		uci commit advanced 2>/dev/null
-	fi
-
-	if [ -z "$atf" ]; then
-		atf=1
-		uci set advanced.@defaults[0].atf_enable="$atf" 2>/dev/null
-		uci commit advanced 2>/dev/null
+	if [ "$atf" != "1" ] && [ "$hwatf" = "1" ]; then
+		logger -t advanced_setup "HW-ATF requires ATF; forcing hw_atf_enable=0"
+		uci set advanced.@defaults[0].hw_atf_enable='0'
+		uci commit advanced
+		hwatf=0
 	fi
 
 	if [ -e "$MODULE_FILE" ]; then
@@ -839,105 +808,58 @@ sync_mt7915e_airtime_module_options()
 		set -- $old_content
 		for token in "$@"; do
 			case "$token" in
-				mt7915e)
-					;;
-				expose_airtime_fairness=*)
+				mt7915e|expose_airtime_fairness=*)
 					;;
 				*)
-					append_mt7915e_module_token "$token"
+					case " $new_line " in
+						*" $token "*)
+							;;
+						*)
+							new_line="$new_line $token"
+							;;
+					esac
 					;;
 			esac
 		done
 
+		if [ "$atf" = "1" ]; then
+			new_line="$new_line expose_airtime_fairness=0"
+		fi
+
 		if [ "$old_content" != "$new_line" ]; then
 			printf '%s\n' "$new_line" > "$MODULE_FILE"
-			logger -t advanced_setup "removed legacy expose_airtime_fairness option from $MODULE_FILE"
+			logger -t advanced_setup "updated $MODULE_FILE to '$new_line'; mt7915e reprobe required for Airtime Fairness mode change"
+			echo "1"
+			return 0
 		fi
 	fi
 
 	echo "0"
 }
 
-sync_mt7915e_module_options()
+hw_atf_setup()
 {
-	local wed_changed
-	local atf_changed
+	FILE="/sys/kernel/debug/ieee80211/phy0/mt76/vow"
+	sync_mt7915e_airtime_module_options >/dev/null
 
-	wed_changed=$(sync_mt7915e_wed_module_options)
-	atf_changed=$(sync_mt7915e_airtime_module_options)
-
-	if [ "$wed_changed" = "1" ] || [ "$atf_changed" = "1" ]; then
-		echo "1"
-	else
-		echo "0"
+	if [ -e "$FILE" ]; then
+		logger -s "smp_affinity: HW-ATF available"
+		if [ "$atf" = "1" ]; then
+			echo 'vow_atf_en=1' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
+		else
+			echo 'vow_atf_en=0' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
+		fi
+		
+		if [ "$atf" = "1" ] && [ "$hwatf" = "1" ]; then
+			echo 'vow_watf_en=1' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
+		else
+			echo 'vow_watf_en=0' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
+		fi
+		echo 'show_vow_info' > /sys/kernel/debug/ieee80211/phy0/mt76/vow
 	fi
 }
 
-hw_atf_setup()
-{
-	local FILE
-	local atf
-	local found=0
-
-	atf=$(uci -q get advanced.@defaults[0].atf_enable 2>/dev/null || echo "1")
-	case "$atf" in
-		1|on|true|yes|enabled)
-			atf=1
-			;;
-		*)
-			atf=0
-			;;
-	esac
-
-	for FILE in /sys/kernel/debug/ieee80211/*/mt76/vow_atf; do
-		[ -e "$FILE" ] || continue
-		found=1
-		logger -s "smp_affinity: VOW ATF/WATF runtime control available at $FILE"
-		printf '%s\n' "$atf" > "$FILE"
-	done
-
-	[ "$found" -eq 1 ] || return 0
-}
-
-runtime_atf()
-{
-	local FILE
-	local found=0
-	local phy
-	local vow_value
-	local vow_state
-	local sep=" "
-
-	printf 'Runtime status:'
-
-	for FILE in /sys/kernel/debug/ieee80211/*/mt76/vow_atf; do
-		[ -e "$FILE" ] || continue
-		found=1
-		phy=${FILE#/sys/kernel/debug/ieee80211/}
-		phy=${phy%%/*}
-		vow_value=$(cat "$FILE" 2>/dev/null)
-		case "$vow_value" in
-			1|Y|y|on|true) vow_state="On" ;;
-			0|N|n|off|false) vow_state="Off" ;;
-			*) vow_state="unknown" ;;
-		esac
-		printf '%s%s VOW ATF/WATF=%s (runtime=%s)' "$sep" "$phy" "$vow_state" "${vow_value:-?}"
-		sep="; "
-	done
-
-	[ "$found" -eq 1 ] || printf ' VOW runtime status unavailable'
-	printf '\n'
-}
-
-advanced_runtime_setup()
-{
-	smp_mt76
-	enable_HQoS
-	cake_mq_setup
-	hw_atf_setup
-}
-
-enable_HQoS()
+enable-HQoS()
 {
 	FILE="/sbin/mtkhnat"
 	if [ -e "$FILE" ]; then
@@ -953,30 +875,6 @@ enable_HQoS()
 	
 }
 
-cake_mq_setup()
-{
-	CAKE_SYNC_TIME_PATH="/sys/kernel/debug/cake_mq/sync_time_ns"
-	value="$1"
-
-	[ -f "$CAKE_SYNC_TIME_PATH" ] || return 0
-
-	if [ -z "$value" ]; then
-		value=$(uci get advanced.@defaults[0].cake_sync_time_ns 2>/dev/null || true)
-	fi
-
-	[ -n "$value" ] || return 0
-
-	case "$value" in
-		''|*[!0-9]*)
-			logger -t advanced_setup "invalid cake_mq sync_time value '$value'"
-			return 1
-			;;
-	esac
-
-	echo "$value" > "$CAKE_SYNC_TIME_PATH"
-	logger -t advanced_setup "cake_mq sync_time set to $(cat "$CAKE_SYNC_TIME_PATH" 2>/dev/null)"
-}
-
 service_triggers() {
     procd_add_reload_trigger advanced network
 }
@@ -988,26 +886,26 @@ start_service() {
 		sleep $delay
 		echo 1 > /tmp/smp_affinity_started
 	fi
-	sync_mt7915e_module_options >/dev/null
-	advanced_runtime_setup
+		smp_mt76
+		enable-HQoS
+		hw_atf_setup
     logger -t advanced_setup "advanced_setup finished"
 }
 
 reload_service() {
     trigger="$1"
     case "$trigger" in
-	        atf)
+        atf)
 			logger -t advanced_setup "advanced_setup atf"
-			sync_mt7915e_airtime_module_options >/dev/null
-			hw_atf_setup
-	        ;;
-	        wed)
+			if [ "$(sync_mt7915e_airtime_module_options)" = "1" ]; then
+				reprobe_mt7915e
+			else
+				hw_atf_setup
+			fi
+            ;;
+        wed)
 			logger -t advanced_setup "advanced_setup wed"
-			sync_mt7915e_wed_module_options >/dev/null
-			;;
-		cake)
-			logger -t advanced_setup "advanced_setup cake"
-			cake_mq_setup "$2"
+			reprobe_mt7915e
 			;;
         *)
 			logger -t advanced_setup "advanced_setup generic"
@@ -1017,10 +915,11 @@ reload_service() {
 				sleep $delay
 				echo 1 > /tmp/smp_affinity_started
 			fi
-			sync_mt7915e_module_options >/dev/null
-			advanced_runtime_setup
+				smp_mt76
+				enable-HQoS
+				hw_atf_setup
 			logger -t advanced_setup "advanced_setup finished"
-			;;
+            ;;
     esac
 }
 
