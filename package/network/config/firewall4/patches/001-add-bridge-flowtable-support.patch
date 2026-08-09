@@ -55,8 +55,8 @@
 +	}
 +
 +	chain forward {
-+		type filter hook forward priority filter; policy accept;
-+		meta l4proto { tcp, udp } flow offload @fb;
++		type filter hook forward priority -1; policy accept;
++		meta l4proto { tcp, udp } flow add @fb counter accept;
 +	}
 +}
 +{% endif %}
