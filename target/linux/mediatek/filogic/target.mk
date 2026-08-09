@@ -4,7 +4,7 @@ BOARDNAME:=Filogic 8x0 (MT798x)
 CPU_TYPE:=cortex-a53
 DEFAULT_PACKAGES += \
 	fitblk kmod-crypto-hw-safexcel kmod-nf-conntrack-bridge \
-	wpad-mbedtls hostapd-utils uboot-envtools
+	kmod-nft-bridge kmod-nft-netdev wpad-mbedtls hostapd-utils uboot-envtools
 KERNELNAME:=Image dtbs
 DEFAULT_PROFILE:=openwrt_one
 
