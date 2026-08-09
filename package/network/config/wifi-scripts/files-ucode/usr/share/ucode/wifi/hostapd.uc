@@ -284,7 +284,7 @@ function device_htmode_append(config) {
 			 * with WiFi 6E clients. Pick the 160MHz half that contains
 			 * the primary channel.
 			 */
-			config.he_oper_chwidth = 3;
+			config.he_oper_chwidth = 2;
 			if (config.channel < config.eht_oper_centr_freq_seg0_idx)
 				config.he_oper_centr_freq_seg0_idx = config.eht_oper_centr_freq_seg0_idx - 16;
 			else
@@ -402,6 +402,7 @@ function device_htmode_append(config) {
 
 		if (config.band == "6g") {
 			config.stationary_ap = true;
+			set_default(config, 'tx_queue_data2_burst', '2.0');
 			append_vars(config, [ 'he_6ghz_reg_pwr_type', ]);
 		}
 
