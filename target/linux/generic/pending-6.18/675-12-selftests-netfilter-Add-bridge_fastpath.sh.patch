@@ -1,7 +1,7 @@
-From 410656c925c0f96fdfa793ffbc6ec30fb87bdd49 Mon Sep 17 00:00:00 2001
+From 503ba6559a88ef9538a3217ee695627747214931 Mon Sep 17 00:00:00 2001
 From: Bohdan Chubuk <chbgdn@gmail.com>
 Date: Wed, 1 Jul 2026 03:40:58 +0300
-Subject: [PATCH 11/11] selftests: netfilter: Add bridge_fastpath.sh
+Subject: [PATCH 12/14] selftests: netfilter: Add bridge_fastpath.sh
 
 Add a script to test various scenarios where a bridge is involved
 in the fastpath. It runs tests in the forward path, and also in
@@ -17,7 +17,7 @@ SWITCHDEV_OBJ_ID_PORT_VLAN.
 
 See the head of the script for a detailed description.
 
-Based on commit 0de3efb139fe from ericwoud/bpir-nftflow-nf-next-20260512.
+Based on commit d1b3299c0732 from ericwoud/bpir-nftflow-nf-next-20260707.
 
 Signed-off-by: Eric Woudstra <ericwouds@gmail.com>
 ---

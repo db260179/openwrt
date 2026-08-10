@@ -1,12 +1,12 @@
-From 7f8f35a0e428d4ac2d2ed226b49049850d7f2395 Mon Sep 17 00:00:00 2001
+From d9049ce47fd46da8121c20f9d7d927fdf1239331 Mon Sep 17 00:00:00 2001
 From: Bohdan Chubuk <chbgdn@gmail.com>
 Date: Wed, 1 Jul 2026 03:19:53 +0300
-Subject: [PATCH 08/11] netfilter: nf_flow_table_inet: Add nf_flowtable_type
+Subject: [PATCH 08/14] netfilter: nf_flow_table_inet: Add nf_flowtable_type
  flowtable_bridge
 
 This will allow a flowtable to be added to the nft bridge family.
 
-Based on commit f495a9487549 from ericwoud/bpir-nftflow-nf-next-20260512.
+Based on commit d9c8fada6b88 from ericwoud/bpir-nftflow-nf-next-20260707.
 
 Signed-off-by: Eric Woudstra <ericwouds@gmail.com>
 ---

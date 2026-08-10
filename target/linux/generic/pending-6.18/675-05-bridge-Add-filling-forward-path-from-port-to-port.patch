@@ -1,7 +1,7 @@
-From 9ce33128cbe3f2ecddc90fd2d6eaa6003a7402d9 Mon Sep 17 00:00:00 2001
+From c30deb4a73e1e8a0961e17010aa0d42e9b906adc Mon Sep 17 00:00:00 2001
 From: Bohdan Chubuk <chbgdn@gmail.com>
 Date: Wed, 1 Jul 2026 03:18:39 +0300
-Subject: [PATCH 05/11] bridge: Add filling forward path from port to port
+Subject: [PATCH 05/14] bridge: Add filling forward path from port to port
 
 If a port is passed as argument instead of the master, then:
 
@@ -11,7 +11,7 @@ forward path.
 At br_vlan_fill_forward_path_pvid(): lookup vlan group from port
 instead.
 
-Based on commit 9034f670c853 from ericwoud/bpir-nftflow-nf-next-20260512.
+Based on commit 640f342b44f0 from ericwoud/bpir-nftflow-nf-next-20260707.
 
 Signed-off-by: Eric Woudstra <ericwouds@gmail.com>
 ---

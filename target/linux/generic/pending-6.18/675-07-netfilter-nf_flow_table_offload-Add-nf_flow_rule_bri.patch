@@ -1,14 +1,14 @@
-From d30d869ed5e6913becb9810d97a6fd576b6dabe2 Mon Sep 17 00:00:00 2001
+From 28c819759cd9634cb5002da39138831cacd9b987 Mon Sep 17 00:00:00 2001
 From: Bohdan Chubuk <chbgdn@gmail.com>
 Date: Wed, 1 Jul 2026 03:19:27 +0300
-Subject: [PATCH 07/11] netfilter: nf_flow_table_offload: Add
+Subject: [PATCH 07/14] netfilter: nf_flow_table_offload: Add
  nf_flow_rule_bridge()
 
 Add nf_flow_rule_bridge().
 
 It only calls the common rule and adds the redirect.
 
-Based on commit 684e254ed162 from ericwoud/bpir-nftflow-nf-next-20260512.
+Based on commit bb7f64bc456d from ericwoud/bpir-nftflow-nf-next-20260707.
 
 Signed-off-by: Eric Woudstra <ericwouds@gmail.com>
 ---
@@ -18,7 +18,7 @@ Signed-off-by: Eric Woudstra <ericwouds@gmail.com>
 
 --- a/include/net/netfilter/nf_flow_table.h
 +++ b/include/net/netfilter/nf_flow_table.h
-@@ -342,6 +342,9 @@ void nf_flow_table_offload_flush_cleanup
+@@ -348,6 +348,9 @@ void nf_flow_table_offload_flush_cleanup
  int nf_flow_table_offload_setup(struct nf_flowtable *flowtable,
  				struct net_device *dev,
  				enum flow_block_command cmd);
