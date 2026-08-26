@@ -21,12 +21,46 @@ GITBRANCH=$(git branch --show-current)
 DCKRIMAGE="openwrt-imagebuild-${GITBRANCH}:latest"
 DCKRNAME="openwrt-imagebuild-${GITBRANCH}"
 BARGS="--build-arg USERUID=${USERUID} --build-arg USERGID=${USERGID}"
-ARGS="--init --rm --name ${DCKRNAME} -d --cap-add NET_ADMIN -v ${PWD}/openwrt:/home/buser/openwrt -v ${PWD}/../../dl:/home/buser/openwrt/dl"
+ARGS="--init --name ${DCKRNAME} -d --cap-add NET_ADMIN -v ${PWD}/openwrt:/home/buser/openwrt -v ${PWD}/../../dl:/home/buser/openwrt/dl"
+
+# Function to check container state and handle prompt
+check_existing_container() {
+  local status
+  status=$(docker inspect --format='{{.State.Status}}' "${DCKRNAME}" 2>/dev/null || true)
+
+  if [ "${status}" == "running" ]; then
+    echo "Warning: Container '${DCKRNAME}' is already running."
+    read -p "Select action: [A]ttach to container / [S]top container / [C]ancel? (a/s/c): " -n 1 -r
+    echo ""
+    case "$REPLY" in
+      [Aa]*)
+        echo "Attaching to container '${DCKRNAME}'..."
+        echo "(Use Ctrl+P followed by Ctrl+Q to detach without stopping the container)"
+        docker attach "${DCKRNAME}"
+        exit 0
+        ;;
+      [Ss]*)
+        echo "Stopping existing container..."
+        docker stop -t 60 "${DCKRNAME}"
+        docker rm "${DCKRNAME}"
+        ;;
+      *)
+        echo "Operation cancelled."
+        exit 0
+        ;;
+    esac
+  elif [ "${status}" == "exited" ]; then
+      echo "Container '${DCKRNAME}' is currently exited. Starting and attaching..."
+      docker start -ai "${DCKRNAME}"
+      exit 0
+  elif [ -n "${status}" ]; then
+    echo "Removing stopped container '${DCKRNAME}'..."
+    docker rm "${DCKRNAME}" > /dev/null
+  fi
+}
 
 # Check if Docker image exists, if not, build the image
-if [ -n "$(docker images -q ${DCKRIMAGE})" ]; then
-   echo "Docker image ${DCKRIMAGE} is ready!"
-else
+if [ -z "$(docker images -q ${DCKRIMAGE})" ]; then
    echo "Docker image ${DCKRIMAGE} does not exist. Running './$0 build-image' to create it."
    docker build ${BARGS} -t ${DCKRIMAGE} -f Dockerfile.build .
 fi
@@ -46,24 +80,29 @@ case "$1" in
     docker build ${BARGS} -t ${DCKRIMAGE} -f Dockerfile.build .
     ;;
   build-official)
+    check_existing_container
     echo "Building official OpenWrt firmware using ${DCKRIMAGE}..."
     docker run ${ARGS} ${DCKRIMAGE} build-official ${2} ${3}
     build_and_watch
     ;;
   build-custom)
+    check_existing_container
     echo "Building custom OpenWrt firmware using ${DCKRIMAGE}..."
     docker run ${ARGS} ${DCKRIMAGE} build-custom ${opt}
     build_and_watch
     ;;
   rebuild)
+    check_existing_container
     echo "Rebuilding the OpenWrt firmware..."
     docker run ${ARGS} ${DCKRIMAGE} build-rebuild
     ;;
   clean-min)
+    check_existing_container
     echo "Performing a minimal cleanup..."
     docker run ${ARGS} ${DCKRIMAGE} clean-min
     ;;
   clean-full)
+    check_existing_container
     echo "Performing a full cleanup..."
     docker run ${ARGS} ${DCKRIMAGE} clean-full
     ;;
@@ -76,8 +115,9 @@ case "$1" in
     docker stop -t 60 ${DCKRNAME}
     ;;
   shell)
+    check_existing_container
     echo "Entering the Docker container shell..."
-    docker run --init --rm --name ${DCKRNAME} -it --entrypoint /bin/bash \
+    docker run --init --name ${DCKRNAME} -it --entrypoint /bin/bash \
       --privileged -v ${PWD}/openwrt:/home/buser/openwrt -v ${PWD}/../../dl:/home/buser/openwrt/dl ${DCKRIMAGE}
     ;;
   *)
