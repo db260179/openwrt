@@ -45,11 +45,12 @@ $(BIN_DIR)/$(IB_NAME).tar.zst: clean
 	$(INSTALL_DIR) $(PKG_BUILD_DIR)/packages
 
 ifneq ($(CONFIG_USE_APK),)
-  ifeq ($(CONFIG_IB_STANDALONE),)
+ifeq ($(CONFIG_IB_STANDALONE),)
 	$(call FeedSourcesAppendAPK,$(PKG_BUILD_DIR)/repositories)
 	$(VERSION_SED_SCRIPT) $(PKG_BUILD_DIR)/repositories
-  endif
-
+else
+	touch $(PKG_BUILD_DIR)/repositories
+endif
 	$(INSTALL_DATA) ./files/README.apk.md $(PKG_BUILD_DIR)/packages/README.md
 else
   ifeq ($(CONFIG_IB_STANDALONE),)
@@ -89,7 +90,11 @@ ifneq ($(CONFIG_USE_APK),y)
 	$(CP) -L $(STAGING_DIR_ROOT)/usr/sbin/opkg-key $(PKG_BUILD_DIR)/scripts/
 else
 	$(INSTALL_DIR) $(PKG_BUILD_DIR)/keys
-	$(CP) -L $(STAGING_DIR_ROOT)/etc/apk/keys/ $(PKG_BUILD_DIR)/
+	# 1. Copy official keys
+	$(CP) -L $(STAGING_DIR_ROOT)/etc/apk/keys/* $(PKG_BUILD_DIR)/keys/
+	# 2. Copy Buildroot keys
+	-$(CP) -L $(TOPDIR)/public-key.pem $(PKG_BUILD_DIR)/keys/
+	-$(CP) -L $(TOPDIR)/private-key.pem $(PKG_BUILD_DIR)/keys/
 endif
 endif
 
