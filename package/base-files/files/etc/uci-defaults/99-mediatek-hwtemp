@@ -1,0 +1,32 @@
+# Standard OpenWrt way to check board identification
+BOARD=$(cat /tmp/sysinfo/board_name 2>/dev/null)
+
+case "$BOARD" in
+    # This covers most Filogic/MediaTek targets
+    *mediatek*|*filogic*|*mt7981*|*comfast*|*yuncore*)
+
+        # 1. Create the collector script
+        cat << 'EOF' > /usr/bin/get_temp.sh
+#!/bin/sh
+if [ -f /sys/class/thermal/thermal_zone0/temp ]; then
+    cat /sys/class/thermal/thermal_zone0/temp > /tmp/soc_temp
+fi
+EOF
+        chmod +x /usr/bin/get_temp.sh
+
+        # 2. Add to crontabs
+        # Check if entry already exists to avoid duplicates
+        if ! grep -q "get_temp.sh" /etc/crontabs/root 2>/dev/null; then
+            echo "* * * * * /usr/bin/get_temp.sh" >> /etc/crontabs/root
+        fi
+
+        # 3. Ensure cron is enabled and running
+        /etc/init.d/cron enable
+        /etc/init.d/cron restart
+
+        # 4. Run immediately so LuCI has data right away
+        /usr/bin/get_temp.sh
+        ;;
+esac
+
+exit 0
