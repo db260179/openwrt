@@ -17,8 +17,8 @@ jobs:
         run: |
           echo "Building or reusing cached builder image..."
           docker build \
-            --build-arg USERUID=1000 \
-            --build-arg USERGID=1000 \
+            --build-arg USERUID=${{ vars.USERUID }} \
+            --build-arg USERGID=${{ vars.USERGID }} \
             -t openwrt-builder:latest \
             -f docker/Dockerfile.build docker/
 
