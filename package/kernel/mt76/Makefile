@@ -8,8 +8,8 @@ PKG_LICENSE_FILES:=
 
 PKG_SOURCE_URL:=https://github.com/db260179/mt76
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2026-09-09
-PKG_SOURCE_VERSION:=a8756bd3f73bc37a2480516f64f56dc917a29f94
+PKG_SOURCE_DATE:=2026-09-11
+PKG_SOURCE_VERSION:=463c0bfe7f9aac44ec83080feecf6540da4c0788
 PKG_MIRROR_HASH:=skip
 
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
@@ -629,6 +629,7 @@ define KernelPackage/mt7981-firmware/install
 	cp \
 		$(PKG_BUILD_DIR)/firmware/mt7981_wa.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7981_wm.bin \
+    $(PKG_BUILD_DIR)/firmware/mt7981_wo.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7981_rom_patch.bin \
 		$(1)/lib/firmware/mediatek
 endef
