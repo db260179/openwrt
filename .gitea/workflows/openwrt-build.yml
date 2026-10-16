@@ -1,0 +1,54 @@
+name: OpenWrt 25.12 Build Pipeline
+
+on:
+  push:
+    branches:
+      - openwrt-25.12-test
+  workflow_dispatch: # Allows manual trigger from Gitea UI
+
+jobs:
+  build:
+    runs-on: debian-trixie
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Phase 1 - Build / Update Builder Image
+        run: |
+          echo "Building or reusing cached builder image..."
+          docker build \
+            --build-arg USERUID=1000 \
+            --build-arg USERGID=1000 \
+            -t openwrt-builder:latest \
+            -f docker/Dockerfile.build docker/
+
+      - name: Phase 2 - Run OpenWrt Build
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          # Ensure workspace permissions match container user UID
+          chmod +x ./build.sh
+
+          # Prepare the configuration file for the custom build
+          cp Custom-filogic.config Custom.config
+
+          docker run --rm \
+            --cap-add NET_ADMIN \
+            --env TELEGRAM_TOKEN="${TELEGRAM_TOKEN}" \
+            --env TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID}" \
+            --env DISCORD_WEBHOOK="${DISCORD_WEBHOOK}" \
+            -v "${GITHUB_WORKSPACE}:/home/buser/openwrt" \
+            -v "/home/gitea-runner/openwrt/dl:/home/buser/openwrt/dl" \
+            -v "/home/gitea-runner/openwrt/ccache:/home/buser/.ccache" \
+            openwrt-builder:latest \
+            ./build.sh custom nodownload
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-build-log
+          path: build.log
+          if-no-files-found: ignore
