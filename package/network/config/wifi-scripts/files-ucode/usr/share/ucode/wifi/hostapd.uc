@@ -10,6 +10,7 @@ import * as iface from 'wifi.iface';
 import * as nl80211 from 'nl80211';
 import * as ap from 'wifi.ap';
 import * as fs from 'fs';
+import * as libuci from 'uci';
 
 const NL80211_EXT_FEATURE_ENABLE_FTM_RESPONDER = 33;
 const NL80211_EXT_FEATURE_RADAR_BACKGROUND = 61;
@@ -457,6 +458,34 @@ function device_htmode_append(config) {
 	}
 
 	append_vars(config, [ 'tx_queue_data2_burst', 'stationary_ap' ]);
+
+
+
+	let uci = libuci.cursor();
+	let edcca = uci.get_all("advanced", "@edcca[0]") || {};
+
+	if (config.edcca_enable == null)
+		config.edcca_enable = edcca.edcca_enable ?? 1;
+
+	if (config.edcca_compensation == null)
+		config.edcca_compensation = edcca.compensation ?? -6;
+
+	if (!config.edcca_threshold) {
+		if (edcca.edcca_threshold) {
+			config.edcca_threshold = edcca.edcca_threshold;
+		} else {
+			let thres_0 = edcca.thres_0 ?? "-60";
+			let thres_1 = edcca.thres_1 ?? "-62";
+			let thres_2 = edcca.thres_2 ?? "-59";
+			let thres_3 = edcca.thres_3 ?? "-54";
+			config.edcca_threshold = thres_0 + " " + thres_1 + " " + thres_2 + " " + thres_3;
+		}
+	}
+
+
+	warn(`EDCCA debug: enable=${config.edcca_enable}, comp=${config.edcca_compensation}, thres='${config.edcca_threshold}'\n`);
+	append_vars(config, [ 'edcca_enable', 'edcca_compensation', 'edcca_threshold' ]);
+
 }
 
 function device_extended_features(data, flag) {

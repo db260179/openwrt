@@ -135,6 +135,7 @@ hostapd_common_add_device_config() {
 	config_add_string acs_chan_bias
 	config_add_array hostapd_options
 
+	config_add_string edcca_enable edcca_threshold edcca_compensation
 	config_add_int airtime_mode
 	config_add_int mbssid
 
@@ -147,7 +148,7 @@ hostapd_prepare_device_config() {
 
 	local base_cfg=
 
-	json_get_vars country country3 country_ie beacon_int:100 doth require_mode legacy_rates \
+	json_get_vars edcca_enable edcca_threshold edcca_compensation country country3 country_ie beacon_int:100 doth require_mode legacy_rates \
 		acs_chan_bias local_pwr_constraint spectrum_mgmt_required airtime_mode cell_density \
 		rts_threshold beacon_rate rssi_reject_assoc_rssi rssi_reject_assoc_timeout rssi_ignore_probe_request \
 		maxassoc mbssid:0 band reg_power_type stationary_ap
@@ -251,6 +252,9 @@ hostapd_prepare_device_config() {
 	append base_cfg "beacon_int=$beacon_int" "$N"
 	[ -n "$rts_threshold" ] && append base_cfg "rts_threshold=$rts_threshold" "$N"
 	[ "$airtime_mode" -gt 0 ] && append base_cfg "airtime_mode=$airtime_mode" "$N"
+	[ -n "$edcca_enable" ] && append base_cfg "edcca_enable=$edcca_enable" "$N"
+	[ -n "$edcca_threshold" ] && append base_cfg "edcca_threshold=$edcca_threshold" "$N"
+	[ -n "$edcca_compensation" ] && append base_cfg "edcca_compensation=$edcca_compensation" "$N"
 	[ -n "$maxassoc" ] && append base_cfg "iface_max_num_sta=$maxassoc" "$N"
 	[ "$mbssid" -gt 0 ] && [ "$mbssid" -le 2 ] && append base_cfg "mbssid=$mbssid" "$N"
 
