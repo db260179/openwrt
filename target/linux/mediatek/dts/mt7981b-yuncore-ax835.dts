@@ -269,6 +269,7 @@
 	 * power. Values are in 0.5 dBm units after the per-chain backoff:
 	 * 22 on 2.4 GHz (2 chains) is ~14 dBm requested and 23 on 5 GHz
 	 * (3 chains) is ~16 dBm requested.
+	 * Reverted to default values for now
 	 */
 	power-limits {
 		r0 {
@@ -276,13 +277,13 @@
 				b0 {
 					channels = <1 14>;
 					rates-cck =
-						/bits/ 8 <22 22 22 22>;
+						/bits/ 8 <31 31 31 31>;
 					rates-ofdm =
-						/bits/ 8 <22 22 22 22 22 22 22 22>;
+						/bits/ 8 <31 31 31 31 31 31 31 31>;
 					rates-mcs =
-						/bits/ 8 <4 22 22 22 22 22 22 22 22 22 22>;
+						/bits/ 8 <4 31 31 31 31 31 31 31 31 31 31>;
 					rates-ru =
-						/bits/ 8 <7 22 22 22 22 22 22 22 22 22 22 22 22>;
+						/bits/ 8 <7 31 31 31 31 31 31 31 31 31 31 31 31>;
 				};
 			};
 
@@ -290,11 +291,11 @@
 				b0 {
 					channels = <36 177>;
 					rates-ofdm =
-						/bits/ 8 <23 23 23 23 23 23 23 23>;
+						/bits/ 8 <37 37 37 37 37 37 37 37>;
 					rates-mcs =
-						/bits/ 8 <4 23 23 23 23 23 23 23 23 23 23>;
+						/bits/ 8 <4 37 37 37 37 37 37 37 37 37 37>;
 					rates-ru =
-						/bits/ 8 <7 23 23 23 23 23 23 23 23 23 23 23 23>;
+						/bits/ 8 <7 37 37 37 37 37 37 37 37 37 37 37 37>;
 				};
 			};
 		};
