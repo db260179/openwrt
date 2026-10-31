@@ -304,11 +304,13 @@
 		reg = <0>;
 		nvmem-cells = <&macaddr_factory_24 1>;
 		nvmem-cell-names = "mac-address";
+		mediatek,tssi-disable;
 	};
 
 	band@1 {
 		reg = <1>;
 		nvmem-cells = <&macaddr_factory_24 2>;
 		nvmem-cell-names = "mac-address";
+		mediatek,tssi-disable;
 	};
 };
