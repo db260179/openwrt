@@ -1,0 +1,39 @@
+From d8c5c05a5b646eb651a4258bd111df59316341ac Mon Sep 17 00:00:00 2001
+From: Rex Lu <rex.lu@mediatek.com>
+Date: Thu, 27 Aug 2026 11:31:49 +0800
+Subject: [PATCH] Add adjust TX_BM_PKT_CNT based on hw token
+
+Signed-off-by: Rex Lu <rex.lu@mediatek.com>
+---
+ drivers/net/ethernet/mediatek/mtk_wed.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+--- a/drivers/net/ethernet/mediatek/mtk_wed.c
++++ b/drivers/net/ethernet/mediatek/mtk_wed.c
+@@ -46,7 +46,7 @@
+ #define MTK_WED_MIOD_ENTRY_CNT		128
+ 
+ #define MTK_WED_TX_BM_DMA_SIZE		65536
+-#define MTK_WED_TX_BM_PKT_CNT		32768
++#define MTK_WED_TX_BM_PKT_CNT(dev)	((dev)->wlan.nbuf * 2)
+ 
+ static struct mtk_wed_hw *hw_list[3];
+ static DEFINE_MUTEX(hw_lock);
+@@ -652,7 +652,7 @@ mtk_wed_tx_buffer_alloc(struct mtk_wed_d
+ 		dev->tx_buf_ring.size = ring_size;
+ 	} else {
+ 		dev->tx_buf_ring.size = MTK_WED_TX_BM_DMA_SIZE;
+-		ring_size = MTK_WED_TX_BM_PKT_CNT;
++		ring_size = MTK_WED_TX_BM_PKT_CNT(dev);
+ 	}
+ 	n_pages = dev->tx_buf_ring.size / MTK_WED_BUF_PER_PAGE;
+ 
+@@ -1576,7 +1576,7 @@ mtk_wed_hw_init(struct mtk_wed_device *d
+ 			MTK_WED_TX_TKID_CTRL_FREE_FORMAT);
+ 
+ 		wed_w32(dev, MTK_WED_TX_BM_INIT_PTR,
+-			MTK_WED_TX_BM_PKT_CNT |
++			MTK_WED_TX_BM_PKT_CNT(dev) |
+ 			MTK_WED_TX_BM_INIT_SW_TAIL_IDX);
+ 	}
+ 
