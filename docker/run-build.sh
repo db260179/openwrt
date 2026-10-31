@@ -82,19 +82,19 @@ case "$1" in
   build-official)
     check_existing_container
     echo "Building official OpenWrt firmware using ${DCKRIMAGE}..."
-    docker run ${ARGS} ${DCKRIMAGE} build-official ${2} ${3}
+    docker run ${ARGS} ${DCKRIMAGE} official ${2} ${3}
     build_and_watch
     ;;
   build-custom)
     check_existing_container
     echo "Building custom OpenWrt firmware using ${DCKRIMAGE}..."
-    docker run ${ARGS} ${DCKRIMAGE} build-custom ${opt}
+    docker run ${ARGS} ${DCKRIMAGE} custom ${opt}
     build_and_watch
     ;;
   rebuild)
     check_existing_container
     echo "Rebuilding the OpenWrt firmware..."
-    docker run ${ARGS} ${DCKRIMAGE} build-rebuild
+    docker run ${ARGS} ${DCKRIMAGE} rebuild
     ;;
   clean-min)
     check_existing_container
