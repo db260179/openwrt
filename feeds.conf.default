@@ -1,5 +1,5 @@
-src-git packages https://github.com/db260179/packages.git;master-mediatek
-src-git luci https://github.com/db260179/luci.git;master-mediatek
+src-git packages https://github.com/db260179/packages.git;master-test
+src-git luci https://github.com/db260179/luci.git;master-test
 src-git routing https://git.openwrt.org/feed/routing.git
 src-git telephony https://git.openwrt.org/feed/telephony.git
 src-git video https://github.com/openwrt/video.git
