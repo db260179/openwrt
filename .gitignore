@@ -39,3 +39,4 @@ git-src
 build.log
 Custom.config
 .build_env
+docker/tftpboot
