@@ -1,0 +1,241 @@
+--- a/net/wireless/debugfs.c
++++ b/net/wireless/debugfs.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/slab.h>
++#include <linux/math64.h>
+ #include "core.h"
+ #include "debugfs.h"
+ 
+@@ -118,6 +119,15 @@
+ 	.llseek = default_llseek,
+ };
+ 
++static ssize_t dfs_status_read(struct file *file, char __user *user_buf,
++			       size_t count, loff_t *ppos);
++
++static const struct file_operations dfs_status_ops = {
++	.read = dfs_status_read,
++	.open = simple_open,
++	.llseek = default_llseek,
++};
++
+ #define DEBUGFS_ADD(name)						\
+ 	debugfs_create_file(#name, 0444, phyd, &rdev->wiphy, &name## _ops)
+ 
+@@ -137,6 +147,7 @@
+ 	DEBUGFS_ADD(short_retry_limit);
+ 	DEBUGFS_ADD(long_retry_limit);
+ 	DEBUGFS_ADD(ht40allow_map);
++	DEBUGFS_ADD(dfs_status);
+ 
+ 	for (i = 0; i < rdev->wiphy.n_radio; i++) {
+ 		radiod = rdev->wiphy.radio_cfg[i].radio_debugfsdir;
+@@ -224,6 +235,206 @@
+ }
+ EXPORT_SYMBOL_GPL(wiphy_locked_debugfs_read);
+ 
++static unsigned int
++dfs_cac_remaining_ms(struct ieee80211_channel *chan, unsigned int wait_time_ms)
++{
++	u64 now, elapsed_ms;
++
++	if (!wait_time_ms || !chan->cac_start_time)
++		return 0;
++
++	now = ktime_get_boottime_ns();
++	if (now <= chan->cac_start_time)
++		return wait_time_ms;
++
++	elapsed_ms = div_u64(now - chan->cac_start_time, NSEC_PER_MSEC);
++	if (elapsed_ms >= wait_time_ms)
++		return 0;
++
++	return wait_time_ms - elapsed_ms;
++}
++
++static void
++dfs_get_cac_status(struct cfg80211_registered_device *rdev,
++		   struct wireless_dev *wdev,
++		   struct ieee80211_channel *chan,
++		   unsigned int *remain_time_ms,
++		   unsigned int *wait_time_ms,
++		   bool *is_background, int *cac_link_id)
++{
++	struct cfg80211_chan_def *chandef;
++	unsigned int link_id;
++
++	*remain_time_ms = 0;
++	*wait_time_ms = 0;
++	*is_background = false;
++	*cac_link_id = -1;
++
++	for_each_valid_link(wdev, link_id) {
++		if (!wdev->links[link_id].cac_started)
++			continue;
++
++		chandef = wdev_chandef(wdev, link_id);
++		if (!chandef || !cfg80211_is_sub_chan(chandef, chan, false))
++			continue;
++
++		*wait_time_ms = wdev->links[link_id].cac_time_ms;
++		*remain_time_ms = dfs_cac_remaining_ms(chan, *wait_time_ms);
++		*cac_link_id = link_id;
++		return;
++	}
++
++	if (rdev->background_radar_wdev != wdev ||
++	    !cfg80211_chandef_valid(&rdev->background_radar_chandef) ||
++	    !cfg80211_is_sub_chan(&rdev->background_radar_chandef, chan, false))
++		return;
++
++	*wait_time_ms = cfg80211_chandef_dfs_cac_time(&rdev->wiphy,
++						      &rdev->background_radar_chandef);
++	if (!*wait_time_ms)
++		*wait_time_ms = IEEE80211_DFS_MIN_CAC_TIME_MS;
++
++	*remain_time_ms = dfs_cac_remaining_ms(chan, *wait_time_ms);
++	*is_background = true;
++}
++
++static size_t dfs_print_chan(struct ieee80211_channel *chan,
++			     unsigned int remain_time_ms,
++			     unsigned int wait_time_ms,
++			     char *buf, size_t buf_size, size_t offset,
++			     bool is_background, int cac_link_id)
++{
++	if (offset >= buf_size)
++		return offset;
++
++	offset += scnprintf(buf + offset, buf_size - offset,
++			     "\tChannel = %d, DFS_state = ", chan->hw_value);
++
++	switch (chan->dfs_state) {
++	case NL80211_DFS_UNAVAILABLE:
++		offset += scnprintf(buf + offset, buf_size - offset, "Unavailable");
++		if (remain_time_ms)
++			offset += scnprintf(buf + offset, buf_size - offset,
++					     ", Non-occupancy Remain Time = %u / %u [sec]",
++					     DIV_ROUND_UP(remain_time_ms, 1000),
++					     DIV_ROUND_UP(wait_time_ms, 1000));
++		else
++			offset += scnprintf(buf + offset, buf_size - offset,
++					     ", Changing state...");
++		break;
++	case NL80211_DFS_USABLE:
++		offset += scnprintf(buf + offset, buf_size - offset, "Usable");
++		if (wait_time_ms)
++			offset += scnprintf(buf + offset, buf_size - offset,
++					     ", CAC Remain Time = %u / %u [sec]",
++					     DIV_ROUND_UP(remain_time_ms, 1000),
++					     DIV_ROUND_UP(wait_time_ms, 1000));
++		break;
++	case NL80211_DFS_AVAILABLE:
++		offset += scnprintf(buf + offset, buf_size - offset, "Available");
++		break;
++	default:
++		offset += scnprintf(buf + offset, buf_size - offset, "Unknown");
++		break;
++	}
++
++	if (is_background)
++		offset += scnprintf(buf + offset, buf_size - offset,
++				     " (background chain)");
++	else if (cac_link_id >= 0)
++		offset += scnprintf(buf + offset, buf_size - offset,
++				     " (link %d)", cac_link_id);
++
++	return offset + scnprintf(buf + offset, buf_size - offset, "\n");
++}
++
++static ssize_t dfs_status_locked(struct wiphy *wiphy, struct file *file,
++				 char *buf, size_t buf_size, void *data)
++{
++	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
++	struct ieee80211_supported_band *sband;
++	struct wireless_dev *wdev;
++	size_t offset = 0;
++	enum nl80211_band band;
++	unsigned int i;
++
++	lockdep_assert_wiphy(wiphy);
++
++	list_for_each_entry(wdev, &wiphy->wdev_list, list) {
++		if (wdev->iftype != NL80211_IFTYPE_AP &&
++		    wdev->iftype != NL80211_IFTYPE_P2P_GO)
++			continue;
++
++		if (offset >= buf_size)
++			break;
++
++		offset += scnprintf(buf + offset, buf_size - offset,
++				    "wdev 0x%x (%s)\nDFS Channel:\n",
++				    wdev->identifier,
++				    wdev->netdev ? wdev->netdev->name : "no-netdev");
++
++		for (band = 0; band < NUM_NL80211_BANDS; band++) {
++			sband = wiphy->bands[band];
++			if (!sband)
++				continue;
++
++			for (i = 0; i < sband->n_channels; i++) {
++				struct ieee80211_channel *chan = &sband->channels[i];
++				unsigned int remain_time_ms, wait_time_ms;
++				bool is_background;
++				int cac_link_id;
++
++				if (!(chan->flags & IEEE80211_CHAN_RADAR))
++					continue;
++
++				if (chan->dfs_state == NL80211_DFS_UNAVAILABLE) {
++					unsigned int elapsed_ms;
++
++					wait_time_ms = IEEE80211_DFS_MIN_NOP_TIME_MS;
++					elapsed_ms = jiffies_to_msecs(jiffies -
++									chan->dfs_state_entered);
++					remain_time_ms = elapsed_ms >= wait_time_ms ?
++							  0 : wait_time_ms - elapsed_ms;
++					is_background = false;
++					cac_link_id = -1;
++				} else {
++					dfs_get_cac_status(rdev, wdev, chan,
++							   &remain_time_ms,
++							   &wait_time_ms,
++							   &is_background,
++							   &cac_link_id);
++				}
++
++				offset = dfs_print_chan(chan, remain_time_ms,
++							wait_time_ms, buf, buf_size,
++							offset, is_background,
++							cac_link_id);
++			}
++		}
++	}
++
++	return offset;
++}
++
++static ssize_t dfs_status_read(struct file *file, char __user *user_buf,
++			       size_t count, loff_t *ppos)
++{
++	struct wiphy *wiphy = file->private_data;
++	char *buf;
++	ssize_t ret;
++
++	buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
++	if (!buf)
++		return -ENOMEM;
++
++	ret = wiphy_locked_debugfs_read(wiphy, file, buf, PAGE_SIZE,
++					user_buf, count, ppos,
++					dfs_status_locked, NULL);
++	kfree(buf);
++
++	return ret;
++}
++
+ struct debugfs_write_work {
+ 	struct wiphy_work work;
+ 	ssize_t (*handler)(struct wiphy *wiphy,
