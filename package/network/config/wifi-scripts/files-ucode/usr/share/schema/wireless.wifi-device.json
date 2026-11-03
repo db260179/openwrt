@@ -788,6 +788,22 @@
 			"description": "VHT TXOP PS mode",
 			"type": "boolean",
 			"default": true
-		}
-	}
+		},
+        "edcca_enable": {
+            "type": [
+                "boolean",
+                "integer",
+                "string"
+            ]
+        },
+        "edcca_compensation": {
+            "type": [
+                "string",
+                "integer"
+            ]
+        },
+        "edcca_threshold": {
+            "type": "string"
+        }
+    }
 }
