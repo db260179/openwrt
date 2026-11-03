@@ -36,3 +36,6 @@ git-src
 .ccache
 .sccache
 .vscode*
+build.log
+Custom.config
+.build_env
