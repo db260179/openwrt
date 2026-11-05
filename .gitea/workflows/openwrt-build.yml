@@ -16,11 +16,17 @@ jobs:
       - name: Phase 1 - Build / Update Builder Image
         run: |
           echo "Building or reusing cached builder image..."
-          docker build \
+          # Keep the web log small: full output goes to a file, tail shown on failure
+          DOCKER_LOG="${RUNNER_TEMP:-/tmp}/docker-build.log"
+          if ! docker build --progress=plain \
             --build-arg USERUID=${{ vars.USERUID }} \
             --build-arg USERGID=${{ vars.USERGID }} \
             -t openwrt-builder:latest \
-            -f docker/Dockerfile.build docker/
+            -f docker/Dockerfile.build docker/ > "${DOCKER_LOG}" 2>&1; then
+            tail -n 100 "${DOCKER_LOG}"
+            exit 1
+          fi
+          echo "Builder image ready."
 
       - name: Phase 2 - Run OpenWrt Build
         env:
@@ -40,16 +46,27 @@ jobs:
             --env TELEGRAM_TOKEN="${TELEGRAM_TOKEN}" \
             --env TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID}" \
             --env DISCORD_WEBHOOK="${DISCORD_WEBHOOK}" \
+            --env BUILD_QUIET=true \
+            --env HEARTBEAT_INTERVAL=120 \
+            --env FAIL_TAIL_LINES=150 \
             -v "${GITHUB_WORKSPACE}:/home/buser/openwrt" \
             -v "/home/gitea-runner/openwrt/dl:/home/buser/openwrt/dl" \
             -v "/home/gitea-runner/openwrt/ccache:/home/buser/.ccache" \
             openwrt-builder:latest \
             custom nodownload
 
+      - name: Compress Build Log
+        if: always()
+        run: |
+          if [ -f build.log ]; then
+            echo "build.log: $(du -h build.log | cut -f1) uncompressed"
+            gzip -f build.log
+          fi
+
       - name: Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-build-log
-          path: build.log
+          path: build.log.gz
           if-no-files-found: ignore
