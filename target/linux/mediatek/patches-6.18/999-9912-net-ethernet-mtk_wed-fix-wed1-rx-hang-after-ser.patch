@@ -1,0 +1,24 @@
+--- a/drivers/net/ethernet/mediatek/mtk_wed.c
++++ b/drivers/net/ethernet/mediatek/mtk_wed.c
+@@ -1846,6 +1846,21 @@ mtk_wed_reset_dma(struct mtk_wed_device
+ 			wed_clr(dev, MTK_WED_WDMA_RX_PREF_CFG,
+ 				MTK_WED_WDMA_RX_PREF_DDONE2_EN);
+ 
++			/* Reset prefetch index */
++			wed_set(dev, MTK_WED_WDMA_RX_PREF_CFG,
++				MTK_WED_WDMA_RX_PREF_RX0_SIDX_CLR |
++				MTK_WED_WDMA_RX_PREF_RX1_SIDX_CLR);
++
++			wed_clr(dev, MTK_WED_WDMA_RX_PREF_CFG,
++				MTK_WED_WDMA_RX_PREF_RX0_SIDX_CLR |
++				MTK_WED_WDMA_RX_PREF_RX1_SIDX_CLR);
++
++			/* Reset prefetch FIFO */
++			wed_w32(dev, MTK_WED_WDMA_RX_PREF_FIFO_CFG,
++				MTK_WED_WDMA_RX_PREF_FIFO_RX0_CLR |
++				MTK_WED_WDMA_RX_PREF_FIFO_RX1_CLR);
++			wed_w32(dev, MTK_WED_WDMA_RX_PREF_FIFO_CFG, 0);
++
+ 			/* 2. Reset dma index */
+ 			wed_w32(dev, MTK_WED_WDMA_RESET_IDX,
+ 				MTK_WED_WDMA_RESET_IDX_RX_ALL);
