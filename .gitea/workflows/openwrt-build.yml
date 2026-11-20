@@ -43,7 +43,7 @@ jobs:
             -v "/home/gitea-runner/openwrt/dl:/home/buser/openwrt/dl" \
             -v "/home/gitea-runner/openwrt/ccache:/home/buser/.ccache" \
             openwrt-builder:latest \
-            ./build.sh custom nodownload
+            custom nodownload
 
       - name: Upload Build Log
         if: always()
