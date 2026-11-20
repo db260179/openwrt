@@ -1,47 +1,148 @@
 #!/bin/bash
+set -o pipefail
+
+# Ensure script runs from the OpenWrt repository root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
 
 # --- CONFIGURATION (SECURE) ---
 # Load secrets from a local file if it exists.
 # This file should be added to your .gitignore.
 if [ -f ".build_env" ]; then
+    # shellcheck source=/dev/null
     source .build_env
 fi
 
-# --- CONFIGURATION (Fill these in to enable notifications) ---
-# Discord Webhook URL
-#DISCORD_WEBHOOK=""
-# Telegram Settings (Bot Token and Chat ID)
-#TELEGRAM_TOKEN=""
-#TELEGRAM_CHAT_ID=""
+# --- CONFIGURATION (Fill these in or set in .build_env to enable notifications) ---
+# DISCORD_WEBHOOK=""
+# TELEGRAM_TOKEN=""
+# TELEGRAM_CHAT_ID=""
 # ------------------------------
 
-if [ "${DEBUG}" == "true" ]; then set -x; fi
+if [ "${DEBUG}" = "true" ]; then set -x; fi
 
-num_cores=$(($(nproc) + 1))
+# Default core heuristic with fallbacks for minimal environments
+num_cores=$(($(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1) + 1))
 
-while getopts ":j:" opt; do
-  case $opt in
-    j) num_cores="$OPTARG" ;;
-    \?) echo "Invalid option: -$OPTARG" >&2; exit 1 ;;
-  esac
+command_action=""
+build_target=""
+download_pkgs=true
+fetch_router_conf=false
+
+show_usage() {
+    echo "Usage: $0 {official|custom|rebuild|rebuild-ignore|clean-min|clean-toolchain|clean-full} [target] [-j cores] [nodownload] [routerconf]"
+    echo "------------------------------------------------------------------------------------------------"
+    echo "official:        Specify target (e.g., ramips/mt7621) using standard OpenWrt config."
+    echo "custom:          Uses Custom.config."
+    echo "rebuild:         Run make defconfig and incremental build with error filtering."
+    echo "rebuild-ignore:  Same as rebuild but continues past errors (-i)."
+    echo "clean-min:       Runs 'make dirclean'."
+    echo "clean-toolchain: Runs 'make dirclean' (backward compatibility)."
+    echo "clean-full:      Runs 'make distclean' (Caution: wipes everything!)."
+    echo "-j <cores>:      Specify number of CPU cores."
+    echo "nodownload:      Skip downloading package sources."
+    echo "routerconf:      Fetch config from a live router."
+}
+
+# --- UNIFIED ARGUMENT PARSER (Supports flags in any position) ---
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -j)
+            if [ -n "$2" ] && [ "$2" -eq "$2" ] 2>/dev/null; then
+                num_cores="$2"
+                shift 2
+            else
+                echo "Error: -j requires a numeric argument." >&2
+                exit 1
+            fi
+            ;;
+        -j*)
+            num_cores="${1#-j}"
+            if ! [ "$num_cores" -eq "$num_cores" ] 2>/dev/null; then
+                echo "Error: -j requires a numeric argument." >&2
+                exit 1
+            fi
+            shift
+            ;;
+        nodownload|--nodownload|--no-download)
+            download_pkgs=false
+            shift
+            ;;
+        routerconf|--routerconf|--router-conf)
+            fetch_router_conf=true
+            shift
+            ;;
+        -d|--debug|debug)
+            set -x
+            shift
+            ;;
+        -h|--help|help)
+            show_usage
+            exit 0
+            ;;
+        official|custom|rebuild|rebuild-ignore|clean-min|clean-toolchain|clean-full)
+            if [ -z "$command_action" ]; then
+                command_action="$1"
+                shift
+                # If command is 'official', capture the target if provided next
+                if [ "$command_action" = "official" ] && [ $# -gt 0 ] && [[ ! "$1" =~ ^- ]] && [ "$1" != "nodownload" ] && [ "$1" != "routerconf" ]; then
+                    build_target="$1"
+                    shift
+                fi
+            else
+                echo "Error: Multiple commands specified ('$command_action' and '$1')." >&2
+                exit 1
+            fi
+            ;;
+        *)
+            if [ "$command_action" = "official" ] && [ -z "$build_target" ]; then
+                build_target="$1"
+                shift
+            else
+                echo "Unknown argument: $1" >&2
+                show_usage
+                exit 1
+            fi
+            ;;
+    esac
 done
-shift $((OPTIND -1))
-arguments=("$@")
+
+if [ -z "$command_action" ]; then
+    show_usage
+    exit 1
+fi
 
 # --- HELPER FUNCTIONS ---
 
+format_duration() {
+    local total_seconds=$1
+    local minutes=$(( total_seconds / 60 ))
+    local seconds=$(( total_seconds % 60 ))
+    if [ "$minutes" -gt 0 ]; then
+        echo "${minutes}m ${seconds}s"
+    else
+        echo "${seconds}s"
+    fi
+}
+
 get_build_version() {
-    local num rev
+    local num=""
+    local rev=""
 
-    num=$(grep '^CONFIG_VERSION_NUMBER=' .config 2>/dev/null | cut -d= -f2 | tr -d '"')
-
-    # If blank, pull the hardcoded fallback from version.mk (e.g. 25.12-SNAPSHOT)
-    if [ -z "$num" ]; then
-        num=$(grep -o '[0-9]\+\.[0-9]\+-SNAPSHOT' include/version.mk 2>/dev/null | head -1)
-        [ -z "$num" ] && num="unknown"
+    if [ -f ".config" ]; then
+        num=$(grep '^CONFIG_VERSION_NUMBER=' .config 2>/dev/null | cut -d= -f2 | tr -d '"')
     fi
 
-    rev=$(./scripts/getver.sh 2>/dev/null)
+    # Fallback to version.mk if not explicitly set in .config
+    if [ -z "$num" ] && [ -f "include/version.mk" ]; then
+        # Default is the last argument of: VERSION_NUMBER:=$(if $(VERSION_NUMBER),$(VERSION_NUMBER),<default>)
+        num=$(grep -m1 '^VERSION_NUMBER:=$(if ' include/version.mk 2>/dev/null | sed -n 's/.*,\([^,()]*\))[[:space:]]*$/\1/p')
+    fi
+    [ -z "$num" ] && num="unknown"
+
+    if [ -x "./scripts/getver.sh" ]; then
+        rev=$(./scripts/getver.sh 2>/dev/null)
+    fi
 
     if [ -n "$rev" ]; then
         echo "${num}-${rev}"
@@ -55,48 +156,79 @@ notify() {
     local duration=$2
     local build_type=$3
     local build_version=$4
-    local build_host=$(hostname)
-    local finish_time=$(date "+%Y-%m-%d %H:%M:%S") # Captures current local time
+    local build_host
+    build_host=$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown")
+    local finish_time
+    finish_time=$(date "+%Y-%m-%d %H:%M:%S")
 
-    # Telegram message (URL-encoded %0A for newlines)
-    local msg="🚀 *OpenWrt Build Report*%0A*Host:* $build_host%0A*Target:* $build_type%0A*Version:* $build_version%0A*Status:* $status%0A*Duration:* $duration%0A*Finished:* $finish_time"
-
-    # Discord Notification
+    # Discord Notification (Safe JSON escaping)
     if [ -n "$DISCORD_WEBHOOK" ]; then
-        local discord_msg="{\"content\": \"🚀 **OpenWrt Build Report**\n**Host:** $build_host\n**Target:** $build_type\n**Version:** $build_version\n**Status:** $status\n**Duration:** $duration\n**Finished:** $finish_time\"}"
-        curl -H "Content-Type: application/json" -X POST -d "$discord_msg" "$DISCORD_WEBHOOK" > /dev/null 2>&1
+        local raw_content="🚀 **OpenWrt Build Report**
+**Host:** $build_host
+**Target:** $build_type
+**Version:** $build_version
+**Status:** $status
+**Duration:** $duration
+**Finished:** $finish_time"
+
+        local discord_json
+        if command -v jq >/dev/null 2>&1; then
+            discord_json=$(jq -n --arg content "$raw_content" '{"content": $content}')
+        else
+            local escaped_content
+            escaped_content=$(printf '%s' "$raw_content" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
+            discord_json="{\"content\": \"$escaped_content\"}"
+        fi
+
+        curl -s -S --connect-timeout 10 --max-time 30 \
+            -H "Content-Type: application/json" \
+            -X POST -d "$discord_json" "$DISCORD_WEBHOOK" > /dev/null 2>&1 || true
     fi
 
-    # Telegram Notification
+    # Telegram Notification (HTML parse mode prevents parse errors caused by underscores/symbols)
     if [ -n "$TELEGRAM_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-        curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
-            -d "chat_id=$TELEGRAM_CHAT_ID" \
-            -d "text=$msg" -d "parse_mode=Markdown" > /dev/null 2>&1
+        local tg_html="🚀 <b>OpenWrt Build Report</b>
+<b>Host:</b> ${build_host}
+<b>Target:</b> ${build_type}
+<b>Version:</b> ${build_version}
+<b>Status:</b> ${status}
+<b>Duration:</b> ${duration}
+<b>Finished:</b> ${finish_time}"
+
+        curl -s -S --connect-timeout 10 --max-time 30 \
+            -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "parse_mode=HTML" \
+            --data-urlencode "text=${tg_html}" > /dev/null 2>&1 || true
     fi
 }
 
 run_build_logic() {
     local type_label=$1
-    local start_time=$(date +%s)
+    local start_time
+    start_time=$(date +%s)
 
     echo "Starting build: $type_label with $num_cores cores..."
 
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y world 2>&1 | tee build.log
-
+    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y world 2>&1 | tee build.log
     local exit_code=${PIPESTATUS[0]}
-    local end_time=$(date +%s)
-    local duration=$(( (end_time - start_time) / 60 ))
-    local build_version=$(get_build_version)
 
-    if [ $exit_code -eq 0 ]; then
-        notify "✅ SUCCESS" "${duration} min" "$type_label" "$build_version"
+    local end_time
+    end_time=$(date +%s)
+    local duration
+    duration=$(format_duration $(( end_time - start_time )))
+    local build_version
+    build_version=$(get_build_version)
+
+    if [ "$exit_code" -eq 0 ]; then
+        notify "✅ SUCCESS" "$duration" "$type_label" "$build_version"
         echo "-------------------------------------------------------"
-        echo "BUILD SUCCESSFUL (${duration} min) [$build_version]"
+        echo "BUILD SUCCESSFUL ($duration) [$build_version]"
         echo "-------------------------------------------------------"
     else
-        notify "❌ FAILED" "${duration} min" "$type_label" "$build_version"
+        notify "❌ FAILED" "$duration" "$type_label" "$build_version"
         echo "-------------------------------------------------------"
-        echo "BUILD FAILED (${duration} min) [$build_version]. Check build.log for errors."
+        echo "BUILD FAILED ($duration) [$build_version]. Check build.log for errors."
         echo "-------------------------------------------------------"
         exit 1
     fi
@@ -104,51 +236,99 @@ run_build_logic() {
 
 prepare_feeds() {
     echo "Updating and installing feeds..."
-    ./scripts/feeds update -a && ./scripts/feeds install -a
+    if ! ./scripts/feeds update -a; then
+        echo "Error: Feeds update failed." >&2
+        return 1
+    fi
+    if ! ./scripts/feeds install -a; then
+        echo "Error: Feeds install failed." >&2
+        return 1
+    fi
+}
+
+build_step_safe() {
+    local target_step=$1
+    echo "Pre-building $target_step (Safety Step: -j${num_cores})..."
+    if ! make "$target_step" -j"${num_cores}" 2>&1 | tee -a build.log; then
+        echo "Parallel build for $target_step failed. Retrying with single core (-j1 V=s) for debug..."
+        if ! make "$target_step" -j1 V=s 2>&1 | tee -a build.log; then
+            echo "Error: Build failed at step '$target_step'." >&2
+            return 1
+        fi
+    fi
 }
 
 build_toolchain_safe() {
-    echo "Pre-building Toolchain (Safety Step)..."
-    make tools/install -j${num_cores} || make tools/install -j1 V=s 2>&1 | tee -a build.log
-    make toolchain/install -j${num_cores} || make toolchain/install -j1 V=s 2>&1 | tee -a build.log
+    build_step_safe "tools/install" || return 1
+    build_step_safe "toolchain/install" || return 1
 }
 
-build-official () {
-    target=$1
+# --- COMMAND IMPLEMENTATIONS ---
+
+build_official() {
+    local target=$1
     if [ -z "$target" ]; then
-        echo "Usage: $0 official <target> (e.g. ramips/mt7621)"
+        echo "Usage: $0 official <target> (e.g. ramips/mt7621)" >&2
         exit 1
     fi
-    prepare_feeds
-    echo "Copy Openwrt official config..."
-    release=$(grep -m1 '$(VERSION_REPO),' include/version.mk | awk -F, '{print $3}' | tr -d ')')
-    wget "$release/targets/$target/config.buildinfo" -O .config
-    echo "Set to use default config"
+
+    prepare_feeds || exit 1
+
+    echo "Copying OpenWrt official config..."
+    local release
+    release=$(grep -m1 '$(VERSION_REPO),' include/version.mk 2>/dev/null | awk -F, '{print $3}' | tr -d ')' | tr -d ' ')
+    if [ -z "$release" ]; then
+        release="https://downloads.openwrt.org/snapshots"
+        echo "Warning: Could not detect VERSION_REPO from include/version.mk; falling back to $release"
+    fi
+
+    local config_url="$release/targets/$target/config.buildinfo"
+    echo "Downloading config from: $config_url"
+    if ! wget --timeout=30 -q --show-progress "$config_url" -O .config; then
+        echo "Error: Failed to download config from $config_url" >&2
+        echo "Please verify target name '$target' and release URL." >&2
+        rm -f .config
+        exit 1
+    fi
+
+    echo "Setting default configuration..."
     make defconfig
-    echo "Download packages before build"
-    [[ ! " ${arguments[@]} " =~ "nodownload" ]] && make download
-    build_toolchain_safe
+
+    if [ "$download_pkgs" = true ]; then
+        echo "Downloading packages before build..."
+        make download -j"${num_cores}" || make download
+    fi
+
+    build_toolchain_safe || exit 1
     run_build_logic "Official-$target"
 }
 
-build-custom () {
-    prepare_feeds
-    if [[ " ${arguments[@]} " =~ "routerconf" ]]; then
-        echo "Grabbing /etc/build.config from your router!"
-        echo "Enter your router hostname or IP address:"
-        read -r routerip
-        echo "Router hostname or IP address: $routerip"
-        echo "Enter username:"
-        read -r user
-        echo "Username: $user"
-        echo "Attempting to grab /etc/build.config from $routerip"
-        scp -3 -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$user@$routerip:/etc/build.config" Custom.config
+build_custom() {
+    prepare_feeds || exit 1
 
-        if [ $? -eq 0 ]; then
+    if [ "$fetch_router_conf" = true ]; then
+        echo "Grabbing /etc/build.config from your router..."
+        local routerip="${ROUTER_IP:-}"
+        local user="${ROUTER_USER:-}"
+
+        if [ -z "$routerip" ]; then
+            read -r -p "Enter your router hostname or IP address: " routerip
+        fi
+        if [ -z "$routerip" ]; then
+            echo "Error: Router IP/hostname cannot be empty." >&2
+            exit 1
+        fi
+
+        if [ -z "$user" ]; then
+            read -r -p "Enter username [root]: " user
+            user="${user:-root}"
+        fi
+
+        echo "Attempting to grab /etc/build.config from $user@$routerip..."
+        if scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$user@$routerip:/etc/build.config" Custom.config; then
             echo "SCP of /etc/build.config to Custom.config was successful!"
         else
-            echo "Something went wrong? Check username or hostname."
-            echo "Check your build config has the /etc/build.config stored on the router."
+            echo "Error: SCP failed. Please check network, username, hostname, and ensure /etc/build.config exists on the router." >&2
             exit 1
         fi
     fi
@@ -156,60 +336,58 @@ build-custom () {
     if [ -f "Custom.config" ]; then
         cp Custom.config .config
     else
-        echo "Custom.config does not exist!"
+        echo "Error: Custom.config does not exist!" >&2
         exit 1
     fi
 
-    echo "Set to use default config"
+    echo "Setting default configuration..."
     make defconfig
-    echo "Download packages before build"
-    [[ ! " ${arguments[@]} " =~ "nodownload" ]] && make download
-    build_toolchain_safe
+
+    if [ "$download_pkgs" = true ]; then
+        echo "Downloading packages before build..."
+        make download -j"${num_cores}" || make download
+    fi
+
+    build_toolchain_safe || exit 1
     run_build_logic "Custom-Build"
 }
 
-build-rebuild () {
+build_rebuild() {
     make defconfig
-    echo "Start build and log to build.log"
-    make -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    echo "Start build and log to build.log (real-time error filter)..."
+    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep --line-buffered -i -E "^make.*(error|[12345]...Entering dir)"
+    local exit_code=${PIPESTATUS[0]}
+    if [ "$exit_code" -ne 0 ]; then
+        echo "Rebuild finished with errors (code $exit_code). Check build.log for details." >&2
+        return "$exit_code"
+    fi
 }
 
-build-rebuild-ignore () {
+build_rebuild_ignore() {
     make defconfig
     echo "Start build and log to build.log - Ignoring build errors..."
-    make -i -j${num_cores} V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep -i -E "^make.*(error|[12345]...Entering dir)"
+    make -i -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep --line-buffered -i -E "^make.*(error|[12345]...Entering dir)"
+    return "${PIPESTATUS[0]}"
 }
 
-clean-min () {
+clean_min() {
     echo "Cleaning: dirclean..."
     make dirclean
 }
 
-clean-full () {
+clean_full() {
     echo "Cleaning: distclean (Full)..."
     make distclean
 }
 
-case "$1" in
-    official)         build-official "$2" ;;
-    custom)           build-custom ;;
-    rebuild)          build-rebuild ;;
-    rebuild-ignore)   build-rebuild-ignore ;;
-    clean-min)        clean-min ;;
-    clean-toolchain)  make dirclean ;; # Kept for backward compatibility
-    clean-full)       clean-full ;;
-    *)
-        echo "Usage: $0 {official|custom|rebuild|rebuild-ignore|clean-min|clean-full} <target> [-j cores] [nodownload] [routerconf]"
-        echo "------------------------------------------------------------------------------------------------"
-        echo "official:       Specify target (e.g., ramips/mt7621) using standard OpenWrt config."
-        echo "custom:         Uses Custom.config."
-        echo "rebuild:        Run make defconfig and incremental build with error filtering."
-        echo "rebuild-ignore: Same as rebuild but continues past errors (-i)."
-        echo "clean-min:      Runs 'make dirclean'."
-        echo "clean-full:     Runs 'make distclean' (Caution: wipes everything!)."
-        echo "-j <cores>:     Specify number of CPU cores."
-        echo "nodownload:     Skip downloading package sources."
-        echo "routerconf:     Fetch config from a live router."
-        exit 1
-        ;;
+# --- DISPATCH ---
+case "$command_action" in
+    official)         build_official "$build_target" ;;
+    custom)           build_custom ;;
+    rebuild)          build_rebuild ;;
+    rebuild-ignore)   build_rebuild_ignore ;;
+    clean-min)        clean_min ;;
+    clean-toolchain)  clean_min ;; # Kept for backward compatibility
+    clean-full)       clean_full ;;
+    *)                show_usage; exit 1 ;;
 esac
