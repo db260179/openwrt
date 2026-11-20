@@ -21,6 +21,23 @@ fi
 
 if [ "${DEBUG}" = "true" ]; then set -x; fi
 
+# --- QUIET / CI MODE ---
+# In quiet mode the full (V=s) output only goes to build.log; the console gets
+# short progress heartbeats, error lines and the log tail on failure. This keeps
+# CI web log viewers (Gitea Actions) small. Auto-enabled on CI, override with
+# BUILD_QUIET=true|false or -q/-v.
+LOG_FILE="build.log"
+HEARTBEAT_INTERVAL="${HEARTBEAT_INTERVAL:-120}"
+FAIL_TAIL_LINES="${FAIL_TAIL_LINES:-150}"
+ERROR_REGEX=': error:|: fatal error:|\*\*\* \[.*\] Error|^make.*Error [0-9]+|ERROR:|undefined reference to|Command exited with non-zero'
+if [ -z "${BUILD_QUIET}" ]; then
+    if [ "${GITEA_ACTIONS}" = "true" ] || [ "${GITHUB_ACTIONS}" = "true" ] || [ "${CI}" = "true" ]; then
+        BUILD_QUIET=true
+    else
+        BUILD_QUIET=false
+    fi
+fi
+
 # Default core heuristic with fallbacks for minimal environments
 num_cores=$(($(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1) + 1))
 
@@ -42,6 +59,8 @@ show_usage() {
     echo "-j <cores>:      Specify number of CPU cores."
     echo "nodownload:      Skip downloading package sources."
     echo "routerconf:      Fetch config from a live router."
+    echo "-q|--quiet:      Log everything to build.log, print only progress/errors (default on CI)."
+    echo "-v|--verbose:    Stream full output to the console (default outside CI)."
 }
 
 # --- UNIFIED ARGUMENT PARSER (Supports flags in any position) ---
@@ -74,6 +93,14 @@ while [ $# -gt 0 ]; do
             ;;
         -d|--debug|debug)
             set -x
+            shift
+            ;;
+        -q|--quiet)
+            BUILD_QUIET=true
+            shift
+            ;;
+        -v|--verbose)
+            BUILD_QUIET=false
             shift
             ;;
         -h|--help|help)
@@ -123,6 +150,68 @@ format_duration() {
     else
         echo "${seconds}s"
     fi
+}
+
+# Run a command with its output appended to $LOG_FILE.
+# Verbose mode: stream to console too. Quiet mode: console only gets heartbeats,
+# error lines and, on failure, the tail of the log.
+run_logged() {
+    local label=$1
+    shift
+
+    if [ "$BUILD_QUIET" != true ]; then
+        "$@" 2>&1 | tee -a "$LOG_FILE"
+        return "${PIPESTATUS[0]}"
+    fi
+
+    echo "[$(date +%H:%M:%S)] >>> ${label} (full output: ${LOG_FILE})"
+    touch "$LOG_FILE"
+    local offset
+    offset=$(wc -l < "$LOG_FILE")
+    local start=$SECONDS
+    local tick=0
+
+    "$@" >>"$LOG_FILE" 2>&1 &
+    local pid=$!
+    trap 'kill "$pid" 2>/dev/null' INT TERM
+
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        tick=$((tick + 1))
+        if [ "$tick" -ge "$HEARTBEAT_INTERVAL" ]; then
+            tick=0
+            _report_progress "$label" "$start" "$offset"
+            offset=$(wc -l < "$LOG_FILE")
+        fi
+    done
+
+    wait "$pid"
+    local rc=$?
+    trap - INT TERM
+    _report_errors "$offset"
+
+    if [ "$rc" -eq 0 ]; then
+        echo "[$(date +%H:%M:%S)] <<< ${label} OK ($(format_duration $((SECONDS - start))))"
+    else
+        echo "[$(date +%H:%M:%S)] <<< ${label} FAILED rc=${rc} ($(format_duration $((SECONDS - start))))" >&2
+        echo "----- last ${FAIL_TAIL_LINES} lines of ${LOG_FILE} -----" >&2
+        tail -n "$FAIL_TAIL_LINES" "$LOG_FILE" | cut -c1-400 >&2
+        echo "----- end of log tail -----" >&2
+    fi
+    return "$rc"
+}
+
+# Print up to 20 new error lines since line $1 of the log.
+_report_errors() {
+    tail -n +$(($1 + 1)) "$LOG_FILE" | grep -E -- "$ERROR_REGEX" | head -n 20 | cut -c1-400
+}
+
+_report_progress() {
+    local label=$1 start=$2 offset=$3
+    local current
+    current=$(tail -n 3000 "$LOG_FILE" | grep -E "^make\[[0-9]+\]: Entering directory" | tail -n 1 | sed "s|.*directory '||; s|'.*||; s|^.*/openwrt/||")
+    echo "[$(date +%H:%M:%S)] ... ${label}: $(format_duration $((SECONDS - start))) elapsed, log $(du -h "$LOG_FILE" | cut -f1), at: ${current:-n/a}"
+    _report_errors "$offset"
 }
 
 get_build_version() {
@@ -210,8 +299,8 @@ run_build_logic() {
 
     echo "Starting build: $type_label with $num_cores cores..."
 
-    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y world 2>&1 | tee build.log
-    local exit_code=${PIPESTATUS[0]}
+    run_logged "make world" make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y world
+    local exit_code=$?
 
     local end_time
     end_time=$(date +%s)
@@ -235,12 +324,13 @@ run_build_logic() {
 }
 
 prepare_feeds() {
+    : > "$LOG_FILE"
     echo "Updating and installing feeds..."
-    if ! ./scripts/feeds update -a; then
+    if ! run_logged "feeds update" ./scripts/feeds update -a; then
         echo "Error: Feeds update failed." >&2
         return 1
     fi
-    if ! ./scripts/feeds install -a; then
+    if ! run_logged "feeds install" ./scripts/feeds install -a; then
         echo "Error: Feeds install failed." >&2
         return 1
     fi
@@ -249,9 +339,9 @@ prepare_feeds() {
 build_step_safe() {
     local target_step=$1
     echo "Pre-building $target_step (Safety Step: -j${num_cores})..."
-    if ! make "$target_step" -j"${num_cores}" 2>&1 | tee -a build.log; then
+    if ! run_logged "make $target_step" make "$target_step" -j"${num_cores}"; then
         echo "Parallel build for $target_step failed. Retrying with single core (-j1 V=s) for debug..."
-        if ! make "$target_step" -j1 V=s 2>&1 | tee -a build.log; then
+        if ! run_logged "make $target_step (retry -j1 V=s)" make "$target_step" -j1 V=s; then
             echo "Error: Build failed at step '$target_step'." >&2
             return 1
         fi
@@ -284,7 +374,7 @@ build_official() {
 
     local config_url="$release/targets/$target/config.buildinfo"
     echo "Downloading config from: $config_url"
-    if ! wget --timeout=30 -q --show-progress "$config_url" -O .config; then
+    if ! wget --timeout=30 -nv "$config_url" -O .config; then
         echo "Error: Failed to download config from $config_url" >&2
         echo "Please verify target name '$target' and release URL." >&2
         rm -f .config
@@ -292,11 +382,11 @@ build_official() {
     fi
 
     echo "Setting default configuration..."
-    make defconfig
+    run_logged "make defconfig" make defconfig || exit 1
 
     if [ "$download_pkgs" = true ]; then
         echo "Downloading packages before build..."
-        make download -j"${num_cores}" || make download
+        run_logged "make download" make download -j"${num_cores}" || run_logged "make download (retry)" make download || exit 1
     fi
 
     build_toolchain_safe || exit 1
@@ -341,11 +431,11 @@ build_custom() {
     fi
 
     echo "Setting default configuration..."
-    make defconfig
+    run_logged "make defconfig" make defconfig || exit 1
 
     if [ "$download_pkgs" = true ]; then
         echo "Downloading packages before build..."
-        make download -j"${num_cores}" || make download
+        run_logged "make download" make download -j"${num_cores}" || run_logged "make download (retry)" make download || exit 1
     fi
 
     build_toolchain_safe || exit 1
@@ -353,10 +443,17 @@ build_custom() {
 }
 
 build_rebuild() {
-    make defconfig
+    : > "$LOG_FILE"
+    run_logged "make defconfig" make defconfig || return 1
     echo "Start build and log to build.log (real-time error filter)..."
-    make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep --line-buffered -i -E "^make.*(error|[12345]...Entering dir)"
-    local exit_code=${PIPESTATUS[0]}
+    local exit_code
+    if [ "$BUILD_QUIET" = true ]; then
+        run_logged "make" make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y
+        exit_code=$?
+    else
+        make -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee -a "$LOG_FILE" | grep --line-buffered -i -E "^make.*(error|[12345]...Entering dir)"
+        exit_code=${PIPESTATUS[0]}
+    fi
     if [ "$exit_code" -ne 0 ]; then
         echo "Rebuild finished with errors (code $exit_code). Check build.log for details." >&2
         return "$exit_code"
@@ -364,9 +461,14 @@ build_rebuild() {
 }
 
 build_rebuild_ignore() {
-    make defconfig
+    : > "$LOG_FILE"
+    run_logged "make defconfig" make defconfig || return 1
     echo "Start build and log to build.log - Ignoring build errors..."
-    make -i -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee build.log | grep --line-buffered -i -E "^make.*(error|[12345]...Entering dir)"
+    if [ "$BUILD_QUIET" = true ]; then
+        run_logged "make -i" make -i -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y
+        return $?
+    fi
+    make -i -j"${num_cores}" V=s CONFIG_DEBUG_SECTION_MISMATCH=y 2>&1 | tee -a "$LOG_FILE" | grep --line-buffered -i -E "^make.*(error|[12345]...Entering dir)"
     return "${PIPESTATUS[0]}"
 }
 
