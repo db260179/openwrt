@@ -467,24 +467,30 @@ function device_htmode_append(config) {
 	if (config.edcca_enable == null)
 		config.edcca_enable = edcca.edcca_enable ?? 1;
 
-	if (config.edcca_compensation == null)
-		config.edcca_compensation = edcca.compensation ?? -6;
+	let edcca_disabled = (config.edcca_enable === false || config.edcca_enable === 0 || config.edcca_enable === "0");
 
-	if (!config.edcca_threshold) {
-		if (edcca.edcca_threshold) {
-			config.edcca_threshold = edcca.edcca_threshold;
-		} else {
-			let thres_0 = edcca.thres_0 ?? "-60";
-			let thres_1 = edcca.thres_1 ?? "-62";
-			let thres_2 = edcca.thres_2 ?? "-59";
-			let thres_3 = edcca.thres_3 ?? "-54";
-			config.edcca_threshold = thres_0 + " " + thres_1 + " " + thres_2 + " " + thres_3;
+	/* When EDCCA is disabled only send the enable flag, no compensation/thresholds */
+	if (edcca_disabled) {
+		config.edcca_enable = 0;
+		append_vars(config, [ 'edcca_enable' ]);
+	} else {
+		if (config.edcca_compensation == null)
+			config.edcca_compensation = edcca.compensation ?? -6;
+
+		if (!config.edcca_threshold) {
+			if (edcca.edcca_threshold) {
+				config.edcca_threshold = edcca.edcca_threshold;
+			} else {
+				let thres_0 = edcca.thres_0 ?? "-60";
+				let thres_1 = edcca.thres_1 ?? "-62";
+				let thres_2 = edcca.thres_2 ?? "-59";
+				let thres_3 = edcca.thres_3 ?? "-54";
+				config.edcca_threshold = thres_0 + " " + thres_1 + " " + thres_2 + " " + thres_3;
+			}
 		}
+
+		append_vars(config, [ 'edcca_enable', 'edcca_compensation', 'edcca_threshold' ]);
 	}
-
-
-	warn(`EDCCA debug: enable=${config.edcca_enable}, comp=${config.edcca_compensation}, thres='${config.edcca_threshold}'\n`);
-	append_vars(config, [ 'edcca_enable', 'edcca_compensation', 'edcca_threshold' ]);
 
 }
 

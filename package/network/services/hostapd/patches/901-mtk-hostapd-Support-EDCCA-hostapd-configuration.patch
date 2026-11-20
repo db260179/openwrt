@@ -22,7 +22,7 @@ diff --git a/hostapd/config_file.c b/hostapd/config_file.c
 index 71ba55c61..23d0a4382 100644
 --- a/hostapd/config_file.c
 +++ b/hostapd/config_file.c
-@@ -4985,6 +4985,40 @@ static int hostapd_config_fill(struct hostapd_config *conf,
+@@ -4985,6 +4985,43 @@ static int hostapd_config_fill(struct hostapd_config *conf,
  		os_strlcpy(bss->apup_peer_ifname_prefix,
  		           pos, sizeof(bss->apup_peer_ifname_prefix));
  #endif // def CONFIG_APUP
@@ -49,6 +49,9 @@ index 71ba55c61..23d0a4382 100644
 +			return 1;
 +		}
 +		conf->edcca_enable = (u8) mode;
++		/* no default compensation when EDCCA is force-disabled */
++		if (mode == EDCCA_MODE_FORCE_DISABLE)
++			conf->edcca_compensation = 0;
 +	} else if (os_strcmp(buf, "edcca_compensation") == 0) {
 +		int val = atoi(pos);
 +		if (val < EDCCA_MIN_COMPENSATION ||
@@ -329,14 +332,16 @@ diff --git a/src/ap/hostapd.c b/src/ap/hostapd.c
 index 10f63c08c..f267ea18a 100644
 --- a/src/ap/hostapd.c
 +++ b/src/ap/hostapd.c
-@@ -2806,6 +2806,13 @@ dfs_offload:
+@@ -2806,6 +2806,15 @@ dfs_offload:
  	}
  #endif /* CONFIG_MESH */
  
 +	if (hostapd_drv_configure_edcca_enable(hapd) < 0)
 +		goto fail;
 +
-+	if (hostapd_drv_configure_edcca_threshold(hapd,
++	/* Do not push threshold defaults when EDCCA is force-disabled */
++	if (hapd->iconf->edcca_enable != EDCCA_MODE_FORCE_DISABLE &&
++	    hostapd_drv_configure_edcca_threshold(hapd,
 +						  hapd->iconf->edcca_threshold) < 0)
 +		goto fail;
 +
